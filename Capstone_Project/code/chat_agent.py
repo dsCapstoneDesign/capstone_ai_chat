@@ -92,21 +92,22 @@ class ChatAgent:
         base_prompt = self.get_persona_prompt()
 
         if self.emotion:
-            base_prompt += f"\n\n사용자의 감정은 '{self.emotion}'입니다. 이 감정에 공감하되, 이유나 상황을 짧게 물어보세요."
+            base_prompt += f"\n\n사용자의 감정은 '{self.emotion}'입니다. 이 감정에 맞춰 부드럽고 신중하게 반응해주세요."
+
         if self.risk.lower() in ["중간", "높음"]:
-            base_prompt += "\n\n민감한 상태일 수 있으므로 따뜻하고 신중하게 말하되, 반드시 질문을 포함하세요."
+            base_prompt += "\n\n민감한 상태일 수 있으므로 조심스럽고 간결하게 표현해주세요."
 
         theory_instruction = ""
         if self.intent == "상담 원함" and theory:
             theory_instruction = (
-                "\n\n상담 이론은 설명하지 말고, 핵심 개념을 상황에 맞춰 짧게 녹여주세요."
+                "\n\n상담 이론은 직접 설명하지 말고, 자연스럽게 상황에 녹여서 간단히 조언해주세요."
             )
 
         closing_instruction = (
-            "\n\n🧠 응답은 반드시 공감 + 질문을 포함해야 하며, 1~2문장 이내로 제한하세요. "
-            "‘왜 그런지’, ‘어떤 상황인지’, ‘무엇이 그랬는지’ 등 이유를 자연스럽게 물어보세요. "
-            "가능하다면 다음에 할 수 있는 작고 구체적인 방향 제시나 힌트도 함께 주세요. "
-            "반복되거나 추상적인 말은 지양하고, 대화를 자연스럽게 이어가세요."
+            "\n\n🧠 응답은 상황에 맞게 자연스럽게 구성하세요. 공감, 질문, 방향 제시 중 일부만 포함해도 괜찮습니다. "
+            "모두를 포함하려 하지 마세요. 오히려 대화를 부자연스럽게 만들 수 있습니다. "
+            "응답은 반드시 1~2문장 이내로 짧고 명확하게 말하고, 반복되는 표현은 피하세요. "
+            "가장 중요한 건 사람처럼 자연스럽고 이어지는 대화를 만드는 것입니다."
         )
 
         return f"""{base_prompt}{theory_instruction}{closing_instruction}
