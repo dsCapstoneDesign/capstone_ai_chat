@@ -12,7 +12,6 @@ class ChatAgent:
         self.persona_prompts = {
             "위로형": (
                 "당신은 따뜻하고 부드러운 말투를 사용하는 상담자입니다.\n"
-                "엄마처럼 포근하게 사용자의 감정을 감싸줍니다.\n"
                 "공감은 하되, 설명은 최소화하고 핵심만 말하세요.\n"
                 "응답은 1~2문장 이내로 제한하고, 같은 말을 반복하지 마세요."
             ),
@@ -40,6 +39,17 @@ class ChatAgent:
 
     def get_persona_prompt(self):
         return self.persona_prompts.get(self.persona, self.persona_prompts["위로형"])
+
+    def get_greeting(self) -> str:
+        """✅ 룰 기반 첫 인사 응답"""
+        greetings = {
+            "위로형": "안녕하세요. 오늘 기분은 어떠세요?",
+            "논리분석형": "안녕하세요. 오늘 기분이 어땠는지 들어보고 싶어요.",
+            "유쾌한친구형": "안녕~ 오늘 기분은 어때? 😊",
+            "여자친구형": "안녕:) 오늘 하루 어땠어?",
+            "남자친구형": "안녕, 오늘 하루는 어땠어?"
+        }
+        return greetings.get(self.persona, greetings["위로형"])
 
     def detect_mode_via_llm(self, user_input: str, memory: str = ""):
         prompt = f"""아래 사용자 입력과 과거 대화를 보고, 상담 단계(casual, explore, counseling), 감정 키워드, 위험도, 상담 의도를 판단해주세요.
@@ -87,12 +97,6 @@ class ChatAgent:
         if self.risk.lower() in ["중간", "높음"]:
             base_prompt += "\n\n민감한 상태일 수 있으므로 따뜻하지만 짧고 신중하게 말해주세요."
 
-        if memory and self.turn == 0:
-            base_prompt += f"\n\n이전 대화 내용이 있습니다:\n{memory}\n\n👉 첫 응답은 특히 짧고 단정적으로 시작해주세요. 공감은 1문장으로, 질문은 간결하게 하세요."
-
-        if self.turn >= 3:
-            base_prompt += "\n\n지금은 상담이 어느 정도 진행된 상태입니다. 실천 전략이 필요하면 핵심만 1~2문장으로 제시하세요."
-
         theory_instruction = ""
         if self.intent == "상담 원함" and theory:
             theory_instruction = (
@@ -116,6 +120,11 @@ class ChatAgent:
 """.strip()
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
+        # ✅ 첫 응답은 룰 기반 반환
+        if self.turn == 0:
+            self.turn += 1
+            return self.get_greeting()
+
         self.turn += 1
         self.detect_mode_via_llm(user_input, memory)
 
