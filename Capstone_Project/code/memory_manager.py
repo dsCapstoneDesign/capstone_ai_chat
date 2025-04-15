@@ -1,4 +1,4 @@
-from config.openai_client import client  # ✅ 공통 client 사용
+from config.openai_client import client
 
 def load_user_memory(member_id: str, message_log: list, max_turns: int = 3) -> list:
     """
@@ -23,6 +23,10 @@ def summarize_memory(memory_messages: list) -> str:
             f"{'USER' if msg.get('type') == 'SEND' else 'BOT'}: {msg.get('message', '').strip()}"
             for msg in memory_messages if isinstance(msg, dict)
         ])
+
+        # ✅ 대화 길이 제한 (너무 긴 경우 뒤에서 1500자만 사용)
+        if len(dialogue) > 1500:
+            dialogue = dialogue[-1500:]
 
         prompt = f"""다음은 사용자의 과거 상담 대화입니다. 내용을 간단히 요약하여 상담 시작 멘트로 만들어 주세요.
 

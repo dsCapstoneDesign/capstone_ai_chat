@@ -5,6 +5,8 @@ class ChatAgent:
         self.turn = 0
         self.mode = "casual"
         self.intent = "상담 원함"
+        self.emotion = ""   # 🔄 감정 상태 저장
+        self.risk = ""      # 🔄 위험도 저장
         self.persona = persona
 
         self.persona_prompts = {
@@ -73,17 +75,28 @@ class ChatAgent:
                     self.mode = line.split(":")[-1].strip().lower()
                 if "의도:" in line:
                     self.intent = line.split(":")[-1].strip()
+                if "감정:" in line:
+                    self.emotion = line.split(":")[-1].strip()
+                if "위험도:" in line:
+                    self.risk = line.split(":")[-1].strip()
         except Exception as e:
             print(f"[⚠️ 모드 예측 실패] {e} → 기존 모드 유지: {self.mode}, {self.intent}")
 
     def build_prompt(self, user_input: str, memory: str = "", theory: str = "") -> str:
         base_prompt = self.get_persona_prompt()
 
+        if self.emotion:
+            base_prompt += f"\n\n현재 사용자의 감정 상태는 '{self.emotion}'입니다. 이에 공감하며 자연스럽게 반응해주세요."
+        if self.risk.lower() in ["중간", "높음"]:
+            base_prompt += "\n\n상대방이 민감하거나 힘든 상태일 수 있으므로, 더 신중하고 조심스럽게 말해주세요."
+
         if memory and self.turn == 0:
             base_prompt += f"\n\n이전에 사용자와 다음과 같은 대화를 나눈 적이 있습니다:\n{memory}\n그 내용을 떠올리며 자연스럽게 이어서 대화를 시작해주세요.\n예: '저번엔 프로젝트가 힘들다고 하셨죠. 요즘은 좀 나아지셨나요?'"
 
-        if self.mode == "counseling":
-            base_prompt += "\n\n현재 민감한 감정 상태이므로, 더 부드럽고 신중한 말투를 유지해주세요."
+        if self.turn >= 3:
+            base_prompt += "\n\n이미 몇 차례 상담이 진행되었으므로, 공감을 넘어 실질적인 제안이나 전략도 제공해주세요."
+        if self.turn >= 6:
+            base_prompt += "\n\n사용자가 충분히 신뢰를 보이고 있으므로, 보다 적극적이고 구체적인 행동 제안도 포함해주세요."
 
         theory_instruction = ""
         if self.intent == "상담 원함" and theory:
@@ -91,8 +104,6 @@ class ChatAgent:
                 "\n\n상담 이론을 단순히 설명하지 말고, 사용자의 상황에 적용해주세요. "
                 "행동 예시나 구체적인 조언을 포함하고, 실제로 도움이 될 수 있게 말해주세요."
             )
-            if self.turn >= 3:
-                theory_instruction += "\n\n지금은 상담이 어느 정도 진행되었으므로, 작고 실천 가능한 행동 전략도 함께 제안해주세요."
 
         closing_instruction = "\n\n응답은 부드럽고 따뜻하게 마무리해주세요. 문장이 끝났다는 느낌이 들도록 자연스럽게 마감하고, 다음 대화를 유도하는 질문으로 마치면 좋아요."
 
@@ -110,10 +121,17 @@ class ChatAgent:
 [상담자 응답]
 """.strip()
 
-    def respond(self, user_input: str, memory: str = "", theory: str = "", max_tokens: int = 300) -> str:
+    def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 300) -> str:
         self.turn += 1
         self.detect_mode_via_llm(user_input, memory)
-        prompt = self.build_prompt(user_input, memory, theory)
+
+        # ✅ theory가 (이론명, 설명) 튜플 리스트일 경우 처리
+        if isinstance(theory, list) and theory and isinstance(theory[0], tuple):
+            theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory])
+        else:
+            theory_text = theory or ""
+
+        prompt = self.build_prompt(user_input, memory, theory_text)
 
         try:
             response = client.chat.completions.create(
@@ -127,9 +145,13 @@ class ChatAgent:
             )
             reply = response.choices[0].message.content.strip()
 
-            if len(reply) < 20 or reply.lower() in ["잘 모르겠어요", "죄송해요"]:
+            if (
+                len(reply) < 30 or
+                any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "그건 어려워요", "확실하지 않아요"])
+            ):
                 return "조금 더 구체적으로 이야기해주실 수 있을까요? 당신의 이야기를 듣고 싶어요."
 
             return reply
+
         except Exception as e:
             return f"[⚠️ OpenAI 응답 실패] {e}"

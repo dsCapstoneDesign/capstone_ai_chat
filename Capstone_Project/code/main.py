@@ -1,36 +1,43 @@
 import argparse
 from chat_agent import ChatAgent
-from memory_manager import summarize_memory
 from wiki_searcher import WikiSearcher
 from vector_manager import query_similar_chats, add_chat_to_vector_db
 
-# ✅ 실시간 챗봇 실행 함수
 def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
-    # ✅ 벡터 DB에서 과거 대화 검색 후 요약 인사말 생성
+    if not user_input.strip():  # ✅ 공백 입력만 거절
+        print("⚠️ 입력이 비어 있습니다. 고민이나 감정을 자유롭게 입력해 주세요.")
+        return
+
     similar_chats = query_similar_chats(member_id, user_input, top_k=3)
-    memory_summary = summarize_memory([{"message": chat} for chat in similar_chats])
+    memory_summary = "\n".join(similar_chats)
 
-    # ✅ 상담 이론 검색 (RAG)
     searcher = WikiSearcher()
-    theory_summary = "\n".join(searcher.search(user_input, top_k=2))
+    theory_pairs = searcher.search(user_input, top_k=2)
+    theory_summary = "\n".join([f"[{name}] {desc}" for name, desc in theory_pairs])
 
-    # ✅ 챗봇 응답 생성
     agent = ChatAgent(persona=persona)
-    response = agent.respond(user_input=user_input, memory=memory_summary, theory=theory_summary)
+    response = agent.respond(user_input=user_input, memory=memory_summary, theory=theory_pairs)
 
-    # ✅ 벡터 DB에 현재 대화 저장
-    add_chat_to_vector_db(member_id=member_id, user_input=user_input, bot_response=response)
+    add_chat_to_vector_db(
+        member_id=member_id,
+        user_input=user_input,
+        bot_response=response,
+        persona=persona,
+        emotion=agent.emotion,
+        risk=agent.risk
+    )
 
-    # ✅ 출력 (테스트용 콘솔 확인용 표시)
-    print("=" * 60)
+    print("=" * 70)
     print(f"👤 사용자: {user_input}")
-    if memory_summary:
-        print(f"📜 상담 시작 멘트: {memory_summary}")
-    print(f"📚 상담 이론 요약: {theory_summary}")
-    print(f"🧘 상담사 응답: {response}")
-    print("=" * 60)
+    print(f"\n📜 Memory 요약:")
+    print(memory_summary if memory_summary else "최근 대화 없음.")
+    print(f"\n📚 관련 상담 이론:")
+    for name, desc in theory_pairs:
+        print(f"• [{name}] {desc}")
+    print(f"\n📊 감정: {agent.emotion or '분석 실패'} | 위험도: {agent.risk or '분석 실패'}")
+    print(f"\n🧘 상담사 응답:\n{response}")
+    print("=" * 70)
 
-# ✅ CLI 실행
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--user_input", type=str, required=True, help="사용자 입력 문장")
