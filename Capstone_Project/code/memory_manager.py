@@ -1,9 +1,4 @@
-from openai import OpenAI
-import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+from config.openai_client import client  # ✅ 공통 client 사용
 
 def load_user_memory(member_id: str, message_log: list, max_turns: int = 3) -> list:
     """

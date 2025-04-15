@@ -1,6 +1,9 @@
 from chat_agent import ChatAgent
 from vector_manager import add_chat_to_vector_db, query_similar_chats
 from wiki_searcher import WikiSearcher
+from dotenv import load_dotenv
+
+load_dotenv()
 
 print("🔑 member_id 입력:")
 member_id = input().strip()

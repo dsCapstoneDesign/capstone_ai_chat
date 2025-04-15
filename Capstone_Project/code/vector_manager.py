@@ -1,11 +1,7 @@
-# ✅ vector_manager.py (최신 Chroma 클라이언트 적용 + OpenAI v1 호환)
+# ✅ 최신 Chroma 클라이언트 + 공통 OpenAI client 사용
 from chromadb import PersistentClient
 from uuid import uuid4
-import openai
-import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from config.openai_client import client  # ✅ 공통 client import
 
 CHROMA_DIR = "./chroma_db"
 
@@ -14,7 +10,7 @@ chroma_client = PersistentClient(path=CHROMA_DIR)
 collection = chroma_client.get_or_create_collection(name="chat_memory")
 
 def get_embedding(text: str) -> list:
-    response = openai_client.embeddings.create(
+    response = client.embeddings.create(
         model="text-embedding-3-small",
         input=text
     )

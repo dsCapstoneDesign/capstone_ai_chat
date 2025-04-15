@@ -1,9 +1,4 @@
-from openai import OpenAI
-import os
-from openai import OpenAI
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+from config.openai_client import client  # ✅ 공통 client import
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -84,7 +79,6 @@ class ChatAgent:
     def build_prompt(self, user_input: str, memory: str = "", theory: str = "") -> str:
         base_prompt = self.get_persona_prompt()
 
-        # ✅ 이전 대화 요약이 있으면 자연스러운 첫 인사에 반영
         if memory and self.turn == 0:
             base_prompt += f"\n\n이전에 사용자와 다음과 같은 대화를 나눈 적이 있습니다:\n{memory}\n그 내용을 떠올리며 자연스럽게 이어서 대화를 시작해주세요.\n예: '저번엔 프로젝트가 힘들다고 하셨죠. 요즘은 좀 나아지셨나요?'"
 
