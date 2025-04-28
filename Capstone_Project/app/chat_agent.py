@@ -107,25 +107,25 @@ class ChatAgent:
             "- 필요한 경우 심리상담이론을 기반으로 대화를 이어나가세요 (20%)\n\n"
             "단, 공감 + 질문 + 방향 제시를 모두 포함하려고 하지 마세요.\n"
             "→ 상황에 맞게 2가지 정도만 섞되, 가장 자연스러운 흐름을 선택하세요.\n\n"
-            "🧩 사용자가 힘든 상황을 겪고 있고, [상담 이론 요약]이 제공된다면:\n"
-            "- 해당 이론을 직접 설명하지 말고,\n"
-            "- **이론의 핵심 개념을 바탕으로 현실적인 제안이나 조언**을 자연스럽게 녹여 응답하세요.\n"
-            "- 예를 들어 '인지 재구성' 이론이 주어지면, \"생각을 다르게 보는 연습을 해볼까요?\" 같은 말로 표현하세요.\n\n"
-            "⛔ 유사한 말을 반복하지 마세요.\n"
-            "⛔ '무엇이 그렇게 만들었나요?' → '어떤 점이 그랬을까요?'처럼 구조만 다른 반복 질문은 피하세요.\n"
-            "✅ 응답은 반드시 1~2문장 이내여야 하며, 사람처럼 자연스럽게 이어지도록 하세요.\n"
-            "✅ 응답 후 무조건 질문으로 마무리할 필요는 없으며, 질문 없이 공감만 하는 응답도 허용됩니다."
+            "✅ 유사한 문장 반복 금지\n"
+            "✅ 반드시 1~2문장 이내로 답변할 것"
         )
 
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
+        print(f"🧩 [디버깅] respond() 진입 - 현재 turn: {self.turn}")
+
         if self.turn == 0:
             self.turn += 1
-            return self.get_greeting()
+            greeting = self.get_greeting()
+            print(f"🧩 [디버깅] 첫 turn -> greeting 리턴: {greeting}")
+            return greeting
 
         self.turn += 1
+        print(f"🧩 [디버깅] detect_mode_via_llm() 호출 직전")
         self.detect_mode_via_llm(user_input, memory)
+        print(f"🧩 [디버깅] detect_mode_via_llm() 완료 - emotion: {self.emotion}, risk: {self.risk}")
 
         if isinstance(theory, list) and theory and isinstance(theory[0], tuple):
             theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory])
@@ -133,8 +133,10 @@ class ChatAgent:
             theory_text = theory or ""
 
         prompt = self.build_prompt(user_input, memory, theory_text)
+        print(f"🧩 [디버깅] build_prompt() 완료")
 
         try:
+            print(f"🛫 [디버깅] OpenAI API 호출 시작")
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -145,14 +147,17 @@ class ChatAgent:
                 max_tokens=max_tokens
             )
             reply = response.choices[0].message.content.strip()
+            print(f"✅ [디버깅] OpenAI 응답 수신: {reply}")
 
             if (
                 len(reply) < 15 or
                 any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "그건 어려워요", "확실하지 않아요"])
             ):
+                print("🧩 [디버깅] 응답 품질 불량 - fallback 문구 리턴")
                 return "조금 더 구체적으로 이야기해주실 수 있을까요?"
 
             return reply
 
         except Exception as e:
-            return f"[⚠️ OpenAI 응답 실패] {e}"
+            print(f"⚠️ [디버깅] OpenAI 호출 실패: {e}")
+            return "조금 더 구체적으로 이야기해주실 수 있을까요?"
