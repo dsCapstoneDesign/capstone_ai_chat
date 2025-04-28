@@ -20,4 +20,4 @@ __pycache__/
 .env
 
 # 대용량 파일
-Capstone_Project/code/chroma_db/
+Capstone_Project/app/chroma_db/

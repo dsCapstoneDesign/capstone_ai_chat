@@ -1,4 +1,4 @@
-# Capstone_Project/code/config/openai_client.py
+# Capstone_Project/app/config/openai_client.py
 
 from dotenv import load_dotenv
 import os

@@ -1,4 +1,4 @@
-from config.openai_client import client
+from .config.openai_client import client
 
 class ChatAgent:
     def __init__(self, persona="위로형"):

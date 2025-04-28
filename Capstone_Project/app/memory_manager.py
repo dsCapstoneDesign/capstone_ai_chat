@@ -1,4 +1,4 @@
-from config.openai_client import client
+from .config.openai_client import client
 
 def load_user_memory(member_id: str, message_log: list, max_turns: int = 3) -> list:
     """

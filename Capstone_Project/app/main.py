@@ -1,7 +1,7 @@
 import argparse
-from chat_agent import ChatAgent
-from wiki_searcher import WikiSearcher
-from vector_manager import query_similar_chats, add_chat_to_vector_db
+from .chat_agent import ChatAgent
+from .wiki_searcher import WikiSearcher
+from .vector_manager import query_similar_chats, add_chat_to_vector_db
 
 def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
     if not user_input.strip():  # ✅ 공백 입력만 거절

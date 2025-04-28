@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Union
 
-from chat_agent import ChatAgent
-from wiki_searcher import WikiSearcher
-from vector_manager import query_similar_chats, add_chat_to_vector_db
+from .chat_agent import ChatAgent
+from .wiki_searcher import WikiSearcher
+from .vector_manager import query_similar_chats, add_chat_to_vector_db
 
 # ✅ FastAPI 서버 초기화
 app = FastAPI()
@@ -69,3 +69,7 @@ def chat_with_ai(req: ChatRequest):
         theory_refs=theory_refs,
         memory_summary=memory_summary
     )
+
+
+def vector_manager():
+    return None

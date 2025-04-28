@@ -2,7 +2,7 @@ import os
 import time
 from uuid import uuid4
 from chromadb import PersistentClient
-from config.openai_client import client  # ✅ OpenAI client import
+from .config.openai_client import client  # ✅ OpenAI client import
 
 CHROMA_DIR = "./chroma_db"
 
