@@ -70,11 +70,11 @@ class ChatAgent:
             for line in content.splitlines():
                 if "단계:" in line:
                     self.mode = line.split(":")[-1].strip().lower()
-                if "의도:" in line:
+                elif "의도:" in line:
                     self.intent = line.split(":")[-1].strip()
-                if "감정:" in line:
+                elif "감정:" in line:
                     self.emotion = line.split(":")[-1].strip()
-                if "위험도:" in line:
+                elif "위험도:" in line:
                     self.risk = line.split(":")[-1].strip()
         except Exception as e:
             print(f"[⚠️ 모드 예측 실패] {e} → 기존 모드 유지: {self.mode}, {self.intent}")
@@ -105,15 +105,12 @@ class ChatAgent:
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
-        print("🧩 [respond 진입] user_input =", user_input)  # ✅ 이 줄 추가
+        print("🧩 [respond 진입] user_input =", user_input)
 
         self.detect_mode_via_llm(user_input, memory)
         print(f"🧩 [디버깅] detect_mode_via_llm() 완료 - emotion: {self.emotion}, risk: {self.risk}")
 
-        if isinstance(theory, list) and theory and isinstance(theory[0], tuple):
-            theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory])
-        else:
-            theory_text = theory or ""
+        theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory]) if isinstance(theory, list) else theory or ""
 
         system_prompt = self.build_prompt(user_input, memory, theory_text)
         print(f"🧩 [디버깅] build_prompt() 완료")
@@ -134,7 +131,7 @@ class ChatAgent:
 
             if (
                 len(reply) < 15 or
-                any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "그건 어려워요", "확실하지 않아요"])
+                any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "어려워요", "확실하지 않아요"])
             ):
                 print("🧩 [디버깅] 응답 품질 불량 - fallback 문구 리턴")
                 return "조금 더 구체적으로 이야기해주실 수 있을까요?"

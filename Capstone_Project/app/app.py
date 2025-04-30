@@ -1,8 +1,5 @@
 import os
-with open("debug_log.txt", "w") as f:
-    f.write("📂 현재 실행 중인 app.py 경로: " + os.path.abspath(__file__) + "\n")
-
-
+import sys
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Union
@@ -11,20 +8,19 @@ from .chat_agent import ChatAgent
 from .wiki_searcher import WikiSearcher
 from .vector_manager import query_similar_chats, add_chat_to_vector_db
 
-# ✅ 디버깅: chat_agent.py가 실제로 어디서 import되고 있는지 경로 출력
-import os
-import sys
+# ✅ 디버깅: app 경로 및 import 경로 확인
 print("📂 [디버깅] 현재 실행 중인 app.py 경로:", os.path.abspath(__file__))
 print("📂 [디버깅] sys.path 상의 import 검색 경로:")
 for path in sys.path:
     print("    -", path)
 
-# ✅ FastAPI 서버 초기화
+# ✅ FastAPI 인스턴스 생성
 app = FastAPI()
 
-# ✅ 전역 검색기
+# ✅ 전역 wiki 검색기 (재사용)
 wiki = WikiSearcher()
 
+# ✅ Request / Response 데이터 모델 정의
 class ChatRequest(BaseModel):
     user_input: str
     member_id: str
@@ -40,7 +36,9 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse)
 def chat_with_ai(req: ChatRequest):
-    # ✅ 입력 유효성 검사
+    """
+    FastAPI 챗봇 응답 엔드포인트
+    """
     if not req.user_input.strip():
         return ChatResponse(
             response="조금 더 구체적으로 말씀해주실 수 있을까요?",
@@ -51,20 +49,23 @@ def chat_with_ai(req: ChatRequest):
             memory_summary=""
         )
 
-    # ✅ memory 요약: 유사 대화 자체 사용
+    # ✅ 벡터 기반 memory 요약
     similar_chats = query_similar_chats(req.member_id, req.user_input, top_k=3)
     memory_summary = "\n".join(similar_chats)
 
     # ✅ 상담 이론 검색
     theory_pairs = wiki.search(req.user_input, top_k=2)
-    theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory_pairs])
     theory_refs = [f"[{name}] {desc}" for name, desc in theory_pairs]
 
     # ✅ 챗봇 응답 생성
     agent = ChatAgent(persona=req.persona)
-    response = agent.respond(user_input=req.user_input, memory=memory_summary, theory=theory_pairs)
+    response = agent.respond(
+        user_input=req.user_input,
+        memory=memory_summary,
+        theory=theory_pairs
+    )
 
-    # ✅ 대화 기록 저장
+    # ✅ 대화 저장
     add_chat_to_vector_db(
         member_id=req.member_id,
         user_input=req.user_input,
@@ -82,7 +83,3 @@ def chat_with_ai(req: ChatRequest):
         theory_refs=theory_refs,
         memory_summary=memory_summary
     )
-
-
-def vector_manager():
-    return None
