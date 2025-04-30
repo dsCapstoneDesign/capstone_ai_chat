@@ -6,6 +6,14 @@ from .chat_agent import ChatAgent
 from .wiki_searcher import WikiSearcher
 from .vector_manager import query_similar_chats, add_chat_to_vector_db
 
+# ✅ 디버깅: chat_agent.py가 실제로 어디서 import되고 있는지 경로 출력
+import os
+import sys
+print("📂 [디버깅] 현재 실행 중인 app.py 경로:", os.path.abspath(__file__))
+print("📂 [디버깅] sys.path 상의 import 검색 경로:")
+for path in sys.path:
+    print("    -", path)
+
 # ✅ FastAPI 서버 초기화
 app = FastAPI()
 
