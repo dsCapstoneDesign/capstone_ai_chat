@@ -105,7 +105,7 @@ class ChatAgent:
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
-        print(f"🧩 [디버깅] respond() 진입")
+        print("🧩 [respond 진입] user_input =", user_input)  # ✅ 이 줄 추가
 
         self.detect_mode_via_llm(user_input, memory)
         print(f"🧩 [디버깅] detect_mode_via_llm() 완료 - emotion: {self.emotion}, risk: {self.risk}")
