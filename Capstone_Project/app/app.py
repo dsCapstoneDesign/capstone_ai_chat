@@ -1,3 +1,8 @@
+import os
+with open("debug_log.txt", "w") as f:
+    f.write("📂 현재 실행 중인 app.py 경로: " + os.path.abspath(__file__) + "\n")
+
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Union
