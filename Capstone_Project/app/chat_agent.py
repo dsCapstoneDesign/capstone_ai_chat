@@ -1,5 +1,7 @@
 from .config.openai_client import client
 
+print("✅ chat_agent.py가 FastAPI에 로딩되었습니다!")  # 디버깅용
+
 class ChatAgent:
     def __init__(self, persona="위로형"):
         self.mode = "casual"
