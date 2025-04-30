@@ -2,7 +2,6 @@ from .config.openai_client import client
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
-        self.turn = 0
         self.mode = "casual"
         self.intent = "상담 원함"
         self.emotion = ""
@@ -39,16 +38,6 @@ class ChatAgent:
 
     def get_persona_prompt(self):
         return self.persona_prompts.get(self.persona, self.persona_prompts["위로형"])
-
-    def get_greeting(self) -> str:
-        greetings = {
-            "위로형": "안녕하세요. 오늘 기분은 어떠세요?",
-            "논리분석형": "안녕하세요. 오늘 기분이 어땠는지 들어보고 싶어요.",
-            "유쾌한친구형": "안녕~ 오늘 기분은 어때? 😊",
-            "여자친구형": "안녕:) 오늘 하루 어땠어?",
-            "남자친구형": "안녕, 오늘 하루는 어땠어?"
-        }
-        return greetings.get(self.persona, greetings["위로형"])
 
     def detect_mode_via_llm(self, user_input: str, memory: str = ""):
         prompt = f"""아래 사용자 입력과 과거 대화를 보고, 상담 단계(casual, explore, counseling), 감정 키워드, 위험도, 상담 의도를 판단해주세요.
@@ -114,16 +103,8 @@ class ChatAgent:
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
-        print(f"🧩 [디버깅] respond() 진입 - 현재 turn: {self.turn}")
+        print(f"🧩 [디버깅] respond() 진입")
 
-        if self.turn == 0:
-            self.turn += 1
-            greeting = self.get_greeting()
-            print(f"🧩 [디버깅] 첫 turn -> greeting 리턴: {greeting}")
-            return greeting
-
-        self.turn += 1
-        print(f"🧩 [디버깅] detect_mode_via_llm() 호출 직전")
         self.detect_mode_via_llm(user_input, memory)
         print(f"🧩 [디버깅] detect_mode_via_llm() 완료 - emotion: {self.emotion}, risk: {self.risk}")
 
