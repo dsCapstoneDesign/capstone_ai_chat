@@ -132,7 +132,7 @@ class ChatAgent:
                 temperature=0.4 if self.mode == "counseling" else 0.7,
                 max_tokens=max_tokens
             )
-            reply = response.choices[0].message.content.strip()
+            reply = response.choices[0].message.content.strip().replace('\n', ' ')
 
             with open("debug_log.txt", "a") as f:
                 f.write(f"✅ GPT 응답 수신: {reply}\n")

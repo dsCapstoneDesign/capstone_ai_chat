@@ -59,7 +59,7 @@ def add_chat_to_vector_db(member_id: str, user_input: str, bot_response: str,
             ids=[str(uuid4())],
             embeddings=[embedding]
         )
-        print(f"✅ 므히힝 [벡터 저장 완료] member_id={member_id}, persona={persona}")
+        print(f"✅ [벡터 저장 완료] member_id={member_id}, persona={persona}")
     except Exception as e:
         print(f"⚠️ [벡터 저장 실패] {e}")
 
