@@ -1,4 +1,4 @@
-from .config.openai_client import client
+from app.config.openai_client import client
 
 with open("debug_log.txt", "a") as f:
     f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")

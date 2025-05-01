@@ -1,7 +1,7 @@
 import argparse
-from .chat_agent import ChatAgent
-from .wiki_searcher import WikiSearcher
-from .vector_manager import query_similar_chats, add_chat_to_vector_db
+from app.chat_agent import ChatAgent
+from app.wiki_searcher import WikiSearcher
+from app.vector_manager import query_similar_chats, add_chat_to_vector_db
 
 # ✅ FastAPI에서 호출할 함수
 def run_model(user_input: str, member_id: str = "1", persona: str = "위로형") -> str:

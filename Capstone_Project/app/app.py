@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Union
 
-from .chat_agent import ChatAgent
-from .wiki_searcher import WikiSearcher
-from .vector_manager import query_similar_chats, add_chat_to_vector_db
+from app.chat_agent import ChatAgent
+from app.wiki_searcher import WikiSearcher
+from app.vector_manager import query_similar_chats, add_chat_to_vector_db
 
 # ✅ 디버깅: app 경로 및 import 경로 확인
 print("📂 [디버깅] 현재 실행 중인 app.py 경로:", os.path.abspath(__file__))
@@ -83,3 +83,11 @@ def chat_with_ai(req: ChatRequest):
         theory_refs=theory_refs,
         memory_summary=memory_summary
     )
+
+
+def chat_agent():
+    return None
+
+
+def vector_manager():
+    return None

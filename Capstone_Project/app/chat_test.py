@@ -1,7 +1,7 @@
-from .chat_agent import ChatAgent
-from .memory_manager import load_user_memory, summarize_memory
-from .wiki_searcher import WikiSearcher
-from .vector_manager import add_chat_to_vector_db  # ✅ 벡터 DB 저장 함수
+from app.chat_agent import ChatAgent
+from app.memory_manager import load_user_memory, summarize_memory
+from app.wiki_searcher import WikiSearcher
+from app.vector_manager import add_chat_to_vector_db  # ✅ 벡터 DB 저장 함수
 
 # ✅ 테스트용 메모리 로그 (실제로는 DB에서 불러오게 될 예정)
 message_log = [
