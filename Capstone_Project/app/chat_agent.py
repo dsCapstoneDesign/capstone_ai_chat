@@ -1,6 +1,7 @@
 from .config.openai_client import client
 
-print("✅ chat_agent.py가 FastAPI에 로딩되었습니다!")  # 디버깅용
+with open("debug_log.txt", "a") as f:
+    f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -76,8 +77,13 @@ class ChatAgent:
                     self.emotion = line.split(":")[-1].strip()
                 elif "위험도:" in line:
                     self.risk = line.split(":")[-1].strip()
+
+            with open("debug_log.txt", "a") as f:
+                f.write(f"🔍 감정 분석 결과 - mode: {self.mode}, emotion: {self.emotion}, risk: {self.risk}\n")
+
         except Exception as e:
-            print(f"[⚠️ 모드 예측 실패] {e} → 기존 모드 유지: {self.mode}, {self.intent}")
+            with open("debug_log.txt", "a") as f:
+                f.write(f"[⚠️ 모드 예측 실패] {e}\n")
 
     def build_prompt(self, user_input: str, memory: str = "", theory: str = "") -> str:
         base_prompt = self.get_persona_prompt()
@@ -105,18 +111,18 @@ class ChatAgent:
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
     def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
-        print("🧩 [respond 진입] user_input =", user_input)
+        with open("debug_log.txt", "a") as f:
+            f.write(f"\n🧩 respond 진입 | user_input: {user_input}\n")
 
         self.detect_mode_via_llm(user_input, memory)
-        print(f"🧩 [디버깅] detect_mode_via_llm() 완료 - emotion: {self.emotion}, risk: {self.risk}")
 
         theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory]) if isinstance(theory, list) else theory or ""
-
         system_prompt = self.build_prompt(user_input, memory, theory_text)
-        print(f"🧩 [디버깅] build_prompt() 완료")
+
+        with open("debug_log.txt", "a") as f:
+            f.write("🧠 build_prompt 완료. GPT 호출 시작...\n")
 
         try:
-            print(f"🛫 [디버깅] OpenAI API 호출 시작")
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -127,17 +133,21 @@ class ChatAgent:
                 max_tokens=max_tokens
             )
             reply = response.choices[0].message.content.strip()
-            print(f"✅ [디버깅] OpenAI 응답 수신: {reply}")
+
+            with open("debug_log.txt", "a") as f:
+                f.write(f"✅ GPT 응답 수신: {reply}\n")
 
             if (
                 len(reply) < 15 or
                 any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "어려워요", "확실하지 않아요"])
             ):
-                print("🧩 [디버깅] 응답 품질 불량 - fallback 문구 리턴")
+                with open("debug_log.txt", "a") as f:
+                    f.write("🧩 응답 품질 낮음 - fallback 문구 반환\n")
                 return "조금 더 구체적으로 이야기해주실 수 있을까요?"
 
             return reply
 
         except Exception as e:
-            print(f"⚠️ [디버깅] OpenAI 호출 실패: {e}")
+            with open("debug_log.txt", "a") as f:
+                f.write(f"⚠️ GPT 호출 실패: {e}\n")
             return "조금 더 구체적으로 이야기해주실 수 있을까요?"
