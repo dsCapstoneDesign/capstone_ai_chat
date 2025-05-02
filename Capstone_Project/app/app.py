@@ -1,11 +1,10 @@
-# ✅ ▸ app.py (번역: sendTime 형식 "2025-05-02 14:53:27" 전달)
+# ✅ ▸ app.py (변경: 반환에서 message 만 전달)
 
 import os
 import sys
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
-from datetime import datetime, timedelta
 
 from app.chat_agent import ChatAgent
 from app.wiki_searcher import WikiSearcher
@@ -19,17 +18,15 @@ for path in sys.path:
 app = FastAPI()
 wiki = WikiSearcher()
 
-# ✅ 백어가 요청한 형식으로 변경
+# ✅ Request 형식
 class ChatSendRequest(BaseModel):
     memberId: int
     message: str
     talkType: str
 
+# ✅ Response 형식 (message 만 전달)
 class ChatSendResponse(BaseModel):
-    memberId: int
-    sendTime: str  # 번개: "2025-05-02 14:53:27" 형식으로 구정
     message: List[str]
-    sender: str
 
 import re
 
@@ -40,12 +37,8 @@ def split_into_sentences(text: str) -> List[str]:
 @app.post("/chat", response_model=ChatSendResponse)
 def chat_with_ai(req: ChatSendRequest):
     if not req.message.strip():
-        korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         return ChatSendResponse(
-            memberId=req.memberId,
-            sendTime=korea_now,
-            message=["조금 더 구체적으로 말씀해주시겠어요?"],
-            sender="bot"
+            message=["조금 더 구체적으로 말씀해주시겠어요?"]
         )
 
     similar_chats = query_similar_chats(str(req.memberId), req.message, top_k=3)
@@ -68,10 +61,6 @@ def chat_with_ai(req: ChatSendRequest):
         risk=agent.risk
     )
 
-    korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
     return ChatSendResponse(
-        memberId=req.memberId,
-        sendTime=korea_now,
-        message=split_into_sentences(full_response),
-        sender="bot"
+        message=split_into_sentences(full_response)
     )
