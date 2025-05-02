@@ -1,4 +1,4 @@
-# ✅ ▸ 수정된 app.py (한국 시간 + TalkType 적용)
+# ✅ ▸ app.py (번역: sendTime 형식 "2025-05-02 14:53:27" 전달)
 
 import os
 import sys
@@ -23,15 +23,14 @@ wiki = WikiSearcher()
 class ChatSendRequest(BaseModel):
     memberId: int
     message: str
-    talkType: str  # 이전의 senderType 대신
+    talkType: str
 
 class ChatSendResponse(BaseModel):
     memberId: int
-    sendTime: str
+    sendTime: str  # 번개: "2025-05-02 14:53:27" 형식으로 구정
     message: List[str]
     sender: str
 
-# ✅ 문장 분리 함수
 import re
 
 def split_into_sentences(text: str) -> List[str]:
@@ -40,9 +39,8 @@ def split_into_sentences(text: str) -> List[str]:
 
 @app.post("/chat", response_model=ChatSendResponse)
 def chat_with_ai(req: ChatSendRequest):
-    # 결과 가입이 없는 경우 fallback
     if not req.message.strip():
-        korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d-%H:%M")
+        korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
         return ChatSendResponse(
             memberId=req.memberId,
             sendTime=korea_now,
@@ -50,7 +48,6 @@ def chat_with_ai(req: ChatSendRequest):
             sender="bot"
         )
 
-    # ✅ memory 요약 + wiki 이론 검색
     similar_chats = query_similar_chats(str(req.memberId), req.message, top_k=3)
     memory_summary = "\n".join(similar_chats)
     theory_pairs = wiki.search(req.message, top_k=2)
@@ -62,7 +59,6 @@ def chat_with_ai(req: ChatSendRequest):
         theory=theory_pairs
     )
 
-    # ✅ 대화 기록 저장
     add_chat_to_vector_db(
         member_id=str(req.memberId),
         user_input=req.message,
@@ -72,7 +68,7 @@ def chat_with_ai(req: ChatSendRequest):
         risk=agent.risk
     )
 
-    korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d-%H:%M")
+    korea_now = (datetime.utcnow() + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
     return ChatSendResponse(
         memberId=req.memberId,
         sendTime=korea_now,
