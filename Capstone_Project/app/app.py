@@ -20,7 +20,6 @@ for path in sys.path:
 app = FastAPI()
 wiki = WikiSearcher()
 
-
 # ✅ Request/Response
 class ChatSendRequest(BaseModel):
     memberId: int
@@ -36,11 +35,9 @@ class EnterRequest(BaseModel):
 class EnterResponse(BaseModel):
     summary: str
 
-
 def split_into_sentences(text: str) -> List[str]:
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     return [s for s in sentences if s]
-
 
 # ✅ 기존 채팅 응답
 @app.post("/chat", response_model=ChatSendResponse)
@@ -48,14 +45,18 @@ def chat_with_ai(req: ChatSendRequest):
     if not req.message.strip():
         return ChatSendResponse(message=["조금 더 구체적으로 말씀해주시겠어요?"])
 
+    # ✅ 기존 대화 기반 유사 메시지 검색
     similar_chats = query_similar_chats(str(req.memberId), req.message, top_k=3)
-    memory_summary = "\n".join(similar_chats)
     theory_pairs = wiki.search(req.message, top_k=2)
+
+    # ✅ DB에서 최근 대화 내용 가져오기
+    message_log = fetch_recent_dialogue(req.memberId, limit=20)
 
     agent = ChatAgent(persona=req.talkType)
     full_response = agent.respond(
         user_input=req.message,
-        memory=memory_summary,
+        message_log=message_log,
+        member_id=str(req.memberId),
         theory=theory_pairs
     )
 
@@ -70,8 +71,7 @@ def chat_with_ai(req: ChatSendRequest):
 
     return ChatSendResponse(message=split_into_sentences(full_response))
 
-
-# ✅ 새로 추가: 입장 시 대화 요약 반환
+# ✅ 입장 시 대화 요약 반환
 @app.post("/enter", response_model=EnterResponse)
 def enter_chat(req: EnterRequest):
     message_log = fetch_recent_dialogue(req.memberId, limit=20)
