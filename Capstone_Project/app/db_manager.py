@@ -28,7 +28,7 @@ def fetch_recent_dialogue(member_id: Union[int, str], limit: int = 20) -> List[D
 
         query = """
             SELECT message, sender, type, send_time
-            FROM chat_table
+            FROM chat
             WHERE member_id = %s
               AND (
                 type = 'SEND' OR
