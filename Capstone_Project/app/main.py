@@ -1,15 +1,17 @@
 import argparse
 from app.chat_agent import ChatAgent
 from app.wiki_searcher import WikiSearcher
-from app.vector_manager import query_similar_chats, add_chat_to_vector_db
+from app.vector_manager import add_chat_to_vector_db
+from app.db_manager import fetch_recent_dialogue
+from app.memory_manager import summarize_memory
 
 # ✅ FastAPI에서 호출할 함수
 def run_model(user_input: str, member_id: str = "1", persona: str = "위로형") -> str:
     if not user_input.strip():
         return "조금 더 구체적으로 말씀해주실 수 있을까요?"
 
-    similar_chats = query_similar_chats(member_id, user_input, top_k=3)
-    memory_summary = "\n".join(similar_chats)
+    message_log = fetch_recent_dialogue(member_id, limit=20)
+    memory_summary = summarize_memory(message_log)
 
     searcher = WikiSearcher()
     theory_pairs = searcher.search(user_input, top_k=2)
@@ -34,8 +36,8 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
         print("⚠️ 입력이 비어 있습니다. 고민이나 감정을 자유롭게 입력해 주세요.")
         return
 
-    similar_chats = query_similar_chats(member_id, user_input, top_k=3)
-    memory_summary = "\n".join(similar_chats)
+    message_log = fetch_recent_dialogue(member_id, limit=20)
+    memory_summary = summarize_memory(message_log)
 
     searcher = WikiSearcher()
     theory_pairs = searcher.search(user_input, top_k=2)

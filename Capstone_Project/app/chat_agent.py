@@ -1,4 +1,5 @@
 from app.config.openai_client import client
+from app.memory_manager import summarize_memory, load_user_memory
 
 with open("debug_log.txt", "a") as f:
     f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")
@@ -110,9 +111,13 @@ class ChatAgent:
 
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
 
-    def respond(self, user_input: str, memory: str = "", theory: list = None, max_tokens: int = 150) -> str:
+    def respond(self, user_input: str, message_log: list, member_id: str, theory: list = None, max_tokens: int = 150) -> str:
         with open("debug_log.txt", "a") as f:
             f.write(f"\n🧩 respond 진입 | user_input: {user_input}\n")
+
+        # ✅ memory 요약 적용
+        memory_raw = load_user_memory(member_id, message_log) if member_id and message_log else []
+        memory = summarize_memory(memory_raw)
 
         self.detect_mode_via_llm(user_input, memory)
 
