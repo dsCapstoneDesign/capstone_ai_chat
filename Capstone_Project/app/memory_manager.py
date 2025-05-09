@@ -1,31 +1,38 @@
 from app.config.openai_client import client
 
-def load_user_memory(member_id: str, message_log: list, max_turns: int = 3) -> list:
+def load_user_memory(member_id: str, message_log: list) -> list:
     """
-    요청으로 받은 message_log 중 member_id에 해당하는 최근 max_turns 대화를 리스트로 반환
+    사용자 ID에 해당하는 전체 대화 중, 핵심 TURN들을 골라 정리
+    - 사용자 메시지는 마지막 5개
+    - 챗봇 응답은 마지막 10개
     """
-    user_history = [
-        row for row in message_log
-        if str(row.get("member_id")) == str(member_id) and row.get("type") in ["SEND", "RECEIVE"]
-    ]
-    return user_history[-(max_turns * 2):]  # 1턴 = 사용자 + 챗봇 → 총 2개씩
+    user_msgs = [m for m in message_log if str(m.get("member_id")) == str(member_id) and m.get("type") == "SEND"]
+    bot_msgs = [m for m in message_log if str(m.get("member_id")) == str(member_id) and m.get("type") == "RECEIVE"]
+
+    selected = user_msgs[-5:] + bot_msgs[-10:]
+    selected.sort(key=lambda x: x.get("send_time", 0))  # 시간순 정렬 (옵션)
+
+    print(f"🧩 load_user_memory: 선택된 메시지 {len(selected)}개")
+    return selected
 
 
 def summarize_memory(memory_messages: list) -> str:
     """
-    최근 memory_messages를 요약하여 자연스럽게 대화를 이어갈 수 있는 시작 멘트 생성
-    ex: "저번엔 학업 문제로 힘드셨는데, 이번에도 비슷한 고민이신가요?"
+    대화 메시지를 바탕으로 상담 시작용 자연스러운 요약 멘트를 생성
     """
     if not memory_messages:
+        print("⚠️ [summarize_memory] memory_messages가 비어 있음")
         return "최근에는 어떤 일이 있으셨나요? 편하게 이야기해 주세요."
 
     try:
         dialogue = "\n".join([
             f"{'사용자' if msg.get('type') == 'SEND' else '상담사'}: {msg.get('message', '').strip()}"
-            for msg in memory_messages if isinstance(msg, dict) and msg.get("message", "").strip()
+            for msg in memory_messages if msg.get("message", "").strip()
         ])
 
-        # ✅ 너무 길 경우 뒤에서 1500자만 사용 (문맥 흐름은 유지)
+        print(f"🧠 [요약 대상 대화 - 총 {len(memory_messages)}개]\n{dialogue}\n---")
+
+        # 길이 초과 방지 (최대 1500자)
         if len(dialogue) > 1500:
             dialogue = dialogue[-1500:]
 
@@ -49,8 +56,14 @@ def summarize_memory(memory_messages: list) -> str:
             temperature=0.6,
             max_tokens=120
         )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        print(f"📝 [요약 결과]\n{result}\n---")
+
+        if len(result) < 5:
+            print("⚠️ 요약 실패 또는 응답 너무 짧음")
+
+        return result
 
     except Exception as e:
-        print(f"[Memory Summarization Error] {e}")
+        print(f"❌ [Memory Summarization Error] {e}")
         return "지난 대화 내용을 불러오는 데 문제가 있었어요. 요즘은 기분이 좀 어떠세요?"
