@@ -33,12 +33,14 @@ class EnterRequest(BaseModel):
     memberId: int
 
 class EnterResponse(BaseModel):
-    summary: str
+    summary: List[str]
 
-# ✅ 응답 문장을 문장 단위로 분리
+# ✅ 응답 문장을 문장 단위로 분리 (한국어 기준 개선)
 def split_into_sentences(text: str) -> List[str]:
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    return [s for s in sentences if s]
+    # 한국어 문장 끝나는 패턴: 마침표, 물음표, 느낌표, ~, … 등
+    sentence_endings = r'[.!?~…]|[\u3002\uFF1F\uFF01]'  # 유니코드 마침표도 포함
+    sentences = re.split(f'(?<={sentence_endings})\s+', text.strip())
+    return [s.strip() for s in sentences if s.strip()]
 
 # ✅ 채팅 요청 처리
 @app.post("/chat", response_model=ChatSendResponse)
@@ -79,8 +81,8 @@ def enter_chat(req: EnterRequest):
     # ✅ 첫 입장인 경우 summary 대신 NULL 반환
     if is_first_entry(str(req.memberId), message_log):
         print("🟡 첫 입장 확인됨 (NULL 출력)")
-        return EnterResponse(summary="NULL")
+        return EnterResponse(summary=["NULL"])
 
     summary = summarize_memory(message_log)
     print(f"🧠 /summary 요약 결과: {summary}")
-    return EnterResponse(summary=summary)
+    return EnterResponse(summary=split_into_sentences(summary))
