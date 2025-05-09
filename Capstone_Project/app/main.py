@@ -3,21 +3,29 @@ from app.chat_agent import ChatAgent
 from app.wiki_searcher import WikiSearcher
 from app.vector_manager import add_chat_to_vector_db
 from app.db_manager import fetch_recent_dialogue
-from app.memory_manager import summarize_memory
+from app.memory_manager import is_first_entry
 
 # ✅ FastAPI에서 호출할 함수
 def run_model(user_input: str, member_id: str = "1", persona: str = "위로형") -> str:
     if not user_input.strip():
         return "조금 더 구체적으로 말씀해주실 수 있을까요?"
 
-    message_log = fetch_recent_dialogue(member_id, limit=20)
-    memory_summary = summarize_memory(message_log)
+    message_log = fetch_recent_dialogue(member_id, limit=100)
+
+    agent = ChatAgent(persona=persona)
+
+    if is_first_entry(member_id, message_log):
+        return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
 
     searcher = WikiSearcher()
     theory_pairs = searcher.search(user_input, top_k=2)
 
-    agent = ChatAgent(persona=persona)
-    response = agent.respond(user_input=user_input, memory=memory_summary, theory=theory_pairs)
+    response = agent.respond(
+        user_input=user_input,
+        message_log=message_log,
+        member_id=member_id,
+        theory=theory_pairs
+    )
 
     add_chat_to_vector_db(
         member_id=member_id,
@@ -36,14 +44,23 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
         print("⚠️ 입력이 비어 있습니다. 고민이나 감정을 자유롭게 입력해 주세요.")
         return
 
-    message_log = fetch_recent_dialogue(member_id, limit=20)
-    memory_summary = summarize_memory(message_log)
+    message_log = fetch_recent_dialogue(member_id, limit=100)
+    agent = ChatAgent(persona=persona)
+
+    if is_first_entry(member_id, message_log):
+        print("🟡 첫 입장입니다.")
+        print("🧘 상담사 응답:\n안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊")
+        return
 
     searcher = WikiSearcher()
     theory_pairs = searcher.search(user_input, top_k=2)
 
-    agent = ChatAgent(persona=persona)
-    response = agent.respond(user_input=user_input, memory=memory_summary, theory=theory_pairs)
+    response = agent.respond(
+        user_input=user_input,
+        message_log=message_log,
+        member_id=member_id,
+        theory=theory_pairs
+    )
 
     add_chat_to_vector_db(
         member_id=member_id,
@@ -56,8 +73,6 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
 
     print("=" * 70)
     print(f"👤 사용자: {user_input}")
-    print(f"\n📜 Memory 요약:")
-    print(memory_summary if memory_summary else "최근 대화 없음.")
     print(f"\n📚 관련 상담 이론:")
     for name, desc in theory_pairs:
         print(f"• [{name}] {desc}")

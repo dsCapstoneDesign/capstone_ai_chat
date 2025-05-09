@@ -6,7 +6,7 @@ from app.chat_agent import ChatAgent
 from app.wiki_searcher import WikiSearcher
 from app.vector_manager import query_similar_chats, add_chat_to_vector_db
 from app.db_manager import fetch_recent_dialogue
-from app.memory_manager import summarize_memory
+from app.memory_manager import summarize_memory, is_first_entry  # ✅ is_first_entry 추가
 
 import os
 import sys
@@ -46,11 +46,9 @@ def chat_with_ai(req: ChatSendRequest):
     if not req.message.strip():
         return ChatSendResponse(message=["조금 더 구체적으로 말씀해주시겠어요?"])
 
-    # ✅ RAG 기반 유사 대화 검색
     similar_chats = query_similar_chats(str(req.memberId), req.message, top_k=3)
     theory_pairs = wiki.search(req.message, top_k=2)
 
-    # ✅ DB에서 사용자 전체 대화 불러오기
     message_log = fetch_recent_dialogue(req.memberId, limit=100)
 
     agent = ChatAgent(persona=req.talkType)
@@ -72,12 +70,17 @@ def chat_with_ai(req: ChatSendRequest):
 
     return ChatSendResponse(message=split_into_sentences(full_response))
 
-# ✅ 입장 시 과거 대화 요약 제공
-@app.post("/enter", response_model=EnterResponse)
+# ✅ 과거 대화 요약 제공 (/summary)
+@app.post("/summary", response_model=EnterResponse)
 def enter_chat(req: EnterRequest):
-    message_log = fetch_recent_dialogue(req.memberId, limit=100)  # ✅ 더 많은 과거 대화 반영
-    print(f"📥 /enter: DB에서 {len(message_log)}개 대화 불러옴")
+    message_log = fetch_recent_dialogue(req.memberId, limit=100)
+    print(f"📥 /summary: DB에서 {len(message_log)}개 대화 불러옴")
+
+    # ✅ 첫 입장인 경우 summary 대신 NULL 반환
+    if is_first_entry(str(req.memberId), message_log):
+        print("🟡 첫 입장 확인됨 (NULL 출력)")
+        return EnterResponse(summary="NULL")
 
     summary = summarize_memory(message_log)
-    print(f"🧠 /enter 요약 결과: {summary}")
+    print(f"🧠 /summary 요약 결과: {summary}")
     return EnterResponse(summary=summary)

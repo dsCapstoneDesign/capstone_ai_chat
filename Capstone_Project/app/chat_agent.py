@@ -1,5 +1,5 @@
 from app.config.openai_client import client
-from app.memory_manager import summarize_memory, load_user_memory
+from app.memory_manager import summarize_memory, load_user_memory, is_first_entry
 
 with open("debug_log.txt", "a") as f:
     f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")
@@ -14,29 +14,22 @@ class ChatAgent:
 
         self.persona_prompts = {
             "위로형": (
+                "[페르소나: 위로형]\n"
                 "당신은 따뜻하고 부드러운 말투를 사용하는 상담자입니다.\n"
                 "공감은 하되, 설명은 최소화하고 핵심만 말하세요.\n"
                 "응답은 1~2문장 이내로 제한하고, 같은 말을 반복하지 마세요."
             ),
-            "논리분석형": (
+            "논리형": (
+                "[페르소나: 논리형]\n"
                 "당신은 차분하고 객관적인 시선으로 상담하는 분석형 상담자입니다.\n"
                 "상황 정리와 문제 해결 중심으로 이야기하지만, 말은 짧고 핵심적이어야 합니다.\n"
                 "1~2문장 이내로 간결하게 말하고, 유사 문장 반복은 절대 하지 마세요."
             ),
-            "유쾌한친구형": (
-                "당신은 유쾌하고 친근한 말투를 사용하는 상담자입니다.\n"
-                "이모지나 반말을 가볍게 섞을 수 있으나, 응답은 짧게!\n"
-                "핵심만 담아 1~2문장 이내로 말하고 같은 유형의 말을 반복하지 마세요."
-            ),
-            "여자친구형": (
-                "당신은 감성적이고 따뜻한 여자친구처럼 말하는 상담자입니다.\n"
-                "공감하며 이야기하되, 응답은 짧고 핵심적이어야 합니다.\n"
-                "반복되는 문장 금지. 응답은 1~2문장으로 제한하세요."
-            ),
-            "남자친구형": (
-                "당신은 듬직하고 부드러운 남자친구처럼 말하는 상담자입니다.\n"
-                "응답은 따뜻하지만 절대 길어지지 않게, 1~2문장 안에서 핵심을 담아 말하세요.\n"
-                "비슷한 말 반복은 하지 말고 간결하게 마무리하세요."
+            "긍정형": (
+                "[페르소나: 긍정형]\n"
+                "당신은 유쾌하고 긍정적인 말투를 사용하는 상담자입니다.\n"
+                "친근하고 명랑한 말투로 짧게 반응하되, 핵심을 놓치지 마세요.\n"
+                "응답은 1~2문장 이내로 제한하고, 같은 유형의 말을 반복하지 마세요."
             )
         }
 
@@ -60,7 +53,7 @@ class ChatAgent:
 """
         try:
             result = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "너는 심리상담 대화 흐름을 분석하는 조력자야."},
                     {"role": "user", "content": prompt}
@@ -90,23 +83,18 @@ class ChatAgent:
         base_prompt = self.get_persona_prompt()
 
         if self.emotion:
-            base_prompt += f"\n\n사용자의 감정은 '{self.emotion}'입니다. 이 감정에 맞춰 부드럽고 신중하게 반응해주세요."
+            base_prompt += f"\n\n[현재 감정 상태]\n사용자는 '{self.emotion}'라는 감정을 표현했습니다."
 
         if self.risk.lower() in ["중간", "높음"]:
-            base_prompt += "\n\n민감한 상태일 수 있으므로 조심스럽고 간결하게 표현해주세요."
+            base_prompt += "\n위험도가 높으므로 조심스럽고 간결하게 표현해주세요."
 
         core_instruction = (
-            "\n\n🧠 당신은 심리상담을 전문으로 하는 AI입니다.\n"
-            "대화의 목적은 사용자의 감정을 이해하고, 안정적인 대화를 이어가는 것입니다.\n\n"
-            "다음을 기준으로 응답을 구성하세요:\n"
-            "- 공감 표현을 통해 사용자 감정을 수용하세요. (25%)\n"
-            "- 대화를 이어가기 위해 질문을 유도하세요. (30%)\n"
-            "- 필요한 경우 조심스럽게 현실적인 방향을 제시하세요. (20%)\n"
-            "- 필요한 경우 심리상담이론을 기반으로 대화를 이어나가세요 (20%)\n\n"
-            "단, 공감 + 질문 + 방향 제시를 모두 포함하려고 하지 마세요.\n"
-            "→ 상황에 맞게 2가지 정도만 섞되, 가장 자연스러운 흐름을 선택하세요.\n\n"
-            "✅ 유사한 문장 반복 금지\n"
-            "✅ 반드시 1~2문장 이내로 답변할 것"
+            "\n\n🧠 당신은 심리상담을 전문으로 하는 AI 상담자입니다.\n"
+            "사용자와 대화를 이어가며 감정을 이해하고 공감하세요.\n"
+            "각 상황에 따라 적절한 반응 유형(공감, 질문, 방향 제시)을 조합해 사용하세요.\n"
+            "무조건 모두 포함하지 말고, 자연스러운 2가지를 선택하세요.\n"
+            "응답은 1~2문장 이내로, 유사 문장 반복은 절대 금지합니다.\n"
+            "페르소나에 맞는 말투를 유지하세요."
         )
 
         return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
@@ -115,8 +103,10 @@ class ChatAgent:
         with open("debug_log.txt", "a") as f:
             f.write(f"\n🧩 respond 진입 | user_input: {user_input}\n")
 
-        # ✅ memory 요약 적용
-        memory_raw = load_user_memory(member_id, message_log) if member_id and message_log else []
+        if is_first_entry(member_id, message_log):
+            return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
+
+        memory_raw = load_user_memory(member_id, message_log)
         memory = summarize_memory(memory_raw)
 
         self.detect_mode_via_llm(user_input, memory)
@@ -128,12 +118,15 @@ class ChatAgent:
             f.write("🧠 build_prompt 완료. GPT 호출 시작...\n")
 
         try:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "assistant", "content": memory},
+                {"role": "user", "content": user_input}
+            ]
+
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_input}
-                ],
+                model="gpt-4o",
+                messages=messages,
                 temperature=0.4 if self.mode == "counseling" else 0.7,
                 max_tokens=max_tokens
             )
