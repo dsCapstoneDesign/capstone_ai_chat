@@ -1,5 +1,6 @@
 from app.config.openai_client import client
 from app.memory_manager import summarize_memory, load_user_memory, is_first_entry
+import random
 
 with open("debug_log.txt", "a") as f:
     f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")
@@ -83,23 +84,28 @@ class ChatAgent:
         base_prompt = self.get_persona_prompt()
 
         if self.emotion:
-            base_prompt += f"\n\n[현재 감정 상태]\n사용자는 '{self.emotion}'라는 감정을 표현했습니다."
+            base_prompt += (
+                f"\n\n[현재 감정 상태]\n"
+                f"사용자는 '{self.emotion}'라는 감정을 표현했습니다. 이 감정에 대해 진심 어린 공감 + 짧은 질문을 포함하세요."
+            )
 
         if self.risk.lower() in ["중간", "높음"]:
             base_prompt += "\n위험도가 높으므로 조심스럽고 간결하게 표현해주세요."
 
         core_instruction = (
-            "\n\n🧠 당신은 심리상담을 전문으로 하는 AI 상담자입니다.\n"
-            "사용자와 대화를 이어가며 감정을 이해하고 공감하세요.\n"
-            "각 상황에 따라 적절한 반응 유형(공감, 질문, 방향 제시)을 조합해 사용하세요.\n"
-            "무조건 모두 포함하지 말고, 자연스러운 2가지를 선택하세요.\n"
-            "응답은 1~2문장 이내로, 유사 문장 반복은 절대 금지합니다.\n"
-            "페르소나에 맞는 말투를 유지하세요."
+            "\n\n🧠 당신은 진짜 사람처럼 따뜻하고 공감력 있는 전문 심리상담자입니다.\n"
+            "상담은 진심 어린 공감으로 시작되고, 감정에 정확히 반응하며, 다음 말을 자연스럽게 이어가야 합니다.\n"
+            "사용자의 말 속에서 감정, 상황, 욕구를 파악하고, 다음 두 가지를 조합하여 응답하세요:\n"
+            "- (1) 감정에 대한 공감 표현\n"
+            "- (2) 감정을 유도하거나, 조금 더 깊이 물어볼 수 있는 짧은 질문\n"
+            "절대 판단하지 말고, 설명도 최소화하며, 말은 짧고 진심 있게 해야 합니다.\n"
+            "페르소나에 따라 말투만 달라지며, 진심과 흐름은 모두 동일합니다.\n"
+            "반드시 2문장을 넘기지 마세요."
         )
 
-        return f"{base_prompt}\n{core_instruction}\n\n[과거 대화 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 입력]\n{user_input}\n\n[상담자 응답]"
+        return f"{base_prompt}\n{core_instruction}\n\n[대화 흐름 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 말]\n{user_input}"
 
-    def respond(self, user_input: str, message_log: list, member_id: str, theory: list = None, max_tokens: int = 150) -> str:
+    def respond(self, user_input: str, message_log: list, member_id: str, theory: list = None, max_tokens: int = 400) -> str:
         with open("debug_log.txt", "a") as f:
             f.write(f"\n🧩 respond 진입 | user_input: {user_input}\n")
 
@@ -109,7 +115,8 @@ class ChatAgent:
         memory_raw = load_user_memory(member_id, message_log)
         memory = summarize_memory(memory_raw)
 
-        self.detect_mode_via_llm(user_input, memory)
+        if len(user_input) > 10:
+            self.detect_mode_via_llm(user_input, memory)
 
         theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory]) if isinstance(theory, list) else theory or ""
         system_prompt = self.build_prompt(user_input, memory, theory_text)
@@ -120,7 +127,7 @@ class ChatAgent:
         try:
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "assistant", "content": memory},
+                {"role": "user", "content": f"(과거 대화)\n{memory}"},
                 {"role": "user", "content": user_input}
             ]
 
@@ -135,13 +142,19 @@ class ChatAgent:
             with open("debug_log.txt", "a") as f:
                 f.write(f"✅ GPT 응답 수신: {reply}\n")
 
+            fallback_candidates = [
+                "지금 말해주신 것만으로도 충분히 소중해요. 혹시 더 나눠주실 수 있을까요?",
+                "마음이 복잡하셨겠어요. 편하실 때 천천히 이어서 말해주셔도 괜찮아요.",
+                "잘 전달되었어요. 어떤 부분부터 이야기하고 싶은지 알려주실래요?"
+            ]
+
             if (
                 len(reply) < 15 or
                 any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "어려워요", "확실하지 않아요"])
             ):
                 with open("debug_log.txt", "a") as f:
                     f.write("🧩 응답 품질 낮음 - fallback 문구 반환\n")
-                return "조금 더 구체적으로 이야기해주실 수 있을까요?"
+                return random.choice(fallback_candidates)
 
             return reply
 
