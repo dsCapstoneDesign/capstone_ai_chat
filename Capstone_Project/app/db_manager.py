@@ -49,6 +49,8 @@ def fetch_recent_dialogue(member_id: Union[int, str], limit: int = 20) -> List[D
             {
                 "message": row["message"],
                 "type": "SEND" if row["sender"] == "USER" else "RECEIVE",
+                "sender": row["sender"],  # ✅ 추가됨
+                "send_time": str(row["send_time"]),  # ✅ merge에서 사용됨
                 "member_id": int(member_id)
             }
             for row in rows
