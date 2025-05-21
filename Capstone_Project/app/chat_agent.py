@@ -1,9 +1,14 @@
-
 from app.config.openai_client import client
-from app.memory_manager import summarize_memory, load_user_memory, is_first_entry
+from app.memory_manager import summarize_memory, load_user_memory
 from app.wiki_searcher import WikiSearcher
 from datetime import datetime
 import json
+
+
+def is_first_entry(member_id, message_log):
+    user_msgs = [m for m in message_log if m.get("sender") == "USER" and str(m.get("member_id")) == str(member_id)]
+    return len(user_msgs) <= 1  # 1개 이하일 경우만 "처음"
+
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -169,12 +174,15 @@ class ChatAgent:
         return f"{system_behavior}\n\n{persona_prompt}\n\n{dialogue_flow}\n\n[대화 요약]\n{memory}\n\n[사용자 발화]\n{user_input}\n\n[상담사 응답]"
 
     def respond(self, user_input: str, message_log: list, member_id: str, max_tokens: int = 150) -> str:
-        if is_first_entry(member_id, message_log):
-            return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
-
         memory_raw = load_user_memory(member_id, message_log)
         memory = summarize_memory(memory_raw, self.persona)
         merged_input = self.merge_recent_user_inputs(message_log, member_id)
+
+        if not merged_input:
+            return "지금 어떤 생각이 드시나요? 편하게 이야기해 주세요. 😊"
+
+        if is_first_entry(member_id, message_log):
+            return "안녕하세요! 처음 오셨군요. 어떤 이야기가 마음에 남아 있는지 나눠주셔도 좋아요."
 
         self.detect_mode_via_llm(merged_input, memory)
 
