@@ -1,6 +1,5 @@
 import argparse
 from app.chat_agent import ChatAgent
-from app.wiki_searcher import WikiSearcher
 from app.vector_manager import add_chat_to_vector_db
 from app.db_manager import fetch_recent_dialogue
 from app.memory_manager import is_first_entry
@@ -11,20 +10,16 @@ def run_model(user_input: str, member_id: str = "1", persona: str = "위로형")
         return "조금 더 구체적으로 말씀해주실 수 있을까요?"
 
     message_log = fetch_recent_dialogue(member_id, limit=100)
-
     agent = ChatAgent(persona=persona)
 
     if is_first_entry(member_id, message_log):
         return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
 
-    searcher = WikiSearcher()
-    theory_pairs = searcher.search(user_input, top_k=2)
-
     response = agent.respond(
         user_input=user_input,
         message_log=message_log,
         member_id=member_id,
-        theory=theory_pairs
+        theory=None  # ✅ 상담 이론 적용 조건은 ChatAgent 내부에서 판단
     )
 
     add_chat_to_vector_db(
@@ -52,14 +47,11 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
         print("🧘 상담사 응답:\n안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊")
         return
 
-    searcher = WikiSearcher()
-    theory_pairs = searcher.search(user_input, top_k=2)
-
     response = agent.respond(
         user_input=user_input,
         message_log=message_log,
         member_id=member_id,
-        theory=theory_pairs
+        theory=None  # ✅ 상담 이론 적용은 ChatAgent 내부에서 판단
     )
 
     add_chat_to_vector_db(
@@ -73,9 +65,6 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
 
     print("=" * 70)
     print(f"👤 사용자: {user_input}")
-    print(f"\n📚 관련 상담 이론:")
-    for name, desc in theory_pairs:
-        print(f"• [{name}] {desc}")
     print(f"\n📊 감정: {agent.emotion or '분석 실패'} | 위험도: {agent.risk or '분석 실패'}")
     print(f"\n🧘 상담사 응답:\n{response}")
     print("=" * 70)

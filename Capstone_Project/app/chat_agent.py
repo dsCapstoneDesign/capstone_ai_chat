@@ -1,9 +1,9 @@
+
 from app.config.openai_client import client
 from app.memory_manager import summarize_memory, load_user_memory, is_first_entry
-import random
-
-with open("debug_log.txt", "a") as f:
-    f.write("✅ chat_agent.py가 FastAPI에 로딩되었습니다!\n")
+from app.wiki_searcher import WikiSearcher
+from datetime import datetime
+import json
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -12,33 +12,85 @@ class ChatAgent:
         self.emotion = ""
         self.risk = ""
         self.persona = persona
+        self.searcher = WikiSearcher()
+        self.theory_data = self.load_theories()
+        self.theory = None
 
         self.persona_prompts = {
             "위로형": (
                 "[페르소나: 위로형]\n"
-                "당신은 따뜻하고 부드러운 말투를 사용하는 상담자입니다.\n"
-                "공감은 하되, 설명은 최소화하고 핵심만 말하세요.\n"
-                "응답은 1~2문장 이내로 제한하고, 같은 말을 반복하지 마세요."
+                "당신은 감정을 우선시하며, 사용자가 충분히 위로받고 있다고 느끼도록 공감하는 따뜻한 상담자입니다.\n"
+                "말투는 부드럽고 다정해야 하며, 감정을 알아주는 형태로 반응합니다.\n"
+                "공감 50% + 질문 30% + 제안 20%"
             ),
             "논리형": (
                 "[페르소나: 논리형]\n"
-                "당신은 차분하고 객관적인 시선으로 상담하는 분석형 상담자입니다.\n"
-                "상황 정리와 문제 해결 중심으로 이야기하지만, 말은 짧고 핵심적이어야 합니다.\n"
-                "1~2문장 이내로 간결하게 말하고, 유사 문장 반복은 절대 하지 마세요."
+                "객관적으로 상황을 정리하고, 논리적 사고로 문제 해결을 돕는 상담자입니다.\n"
+                "질문과 제안이 중심이며, 공감은 최소화하세요.\n"
+                "질문 50% + 제안 40% + 공감 10%"
             ),
             "긍정형": (
                 "[페르소나: 긍정형]\n"
-                "당신은 유쾌하고 긍정적인 말투를 사용하는 상담자입니다.\n"
-                "친근하고 명랑한 말투로 짧게 반응하되, 핵심을 놓치지 마세요.\n"
-                "응답은 1~2문장 이내로 제한하고, 같은 유형의 말을 반복하지 마세요."
+                "분위기를 전환하고, 에너지를 회복시켜주는 유쾌한 상담자입니다.\n"
+                "제안과 격려가 중심이며, 진정성을 유지하세요.\n"
+                "제안 40% + 공감 40% + 질문 20%"
             )
         }
+
+    def load_theories(self, path="dataset/hotpot/corpus/corpus.json"):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    def match_theory(self, emotion: str) -> dict:
+        for theory in self.theory_data:
+            if emotion in theory.get("추천상황", []):
+                return theory
+        return {}
 
     def get_persona_prompt(self):
         return self.persona_prompts.get(self.persona, self.persona_prompts["위로형"])
 
+    def get_strategy_text(self, theory_dict):
+        return (
+            f"[상담 이론 적용]\n"
+            f"이론: {theory_dict['이론명']}\n"
+            f"핵심 개념: {', '.join(theory_dict['핵심개념'])}\n"
+            f"대표 기법: {', '.join(theory_dict['대표기법'])}\n"
+            f"예시: {theory_dict['적용사례'][0]}"
+        )
+
+    def merge_recent_user_inputs(self, message_log: list, member_id: str, max_gap_sec=30, max_merge_count=5) -> str:
+        user_msgs = [m for m in message_log if m.get("sender") == "USER" and str(m.get("member_id")) == str(member_id)]
+        if len(user_msgs) < 1:
+            return ""
+        selected = sorted(user_msgs[-max_merge_count:], key=lambda x: x.get("send_time"))
+        merged = [selected[-1]["message"]]
+        for i in reversed(range(len(selected) - 1)):
+            try:
+                cur_time = datetime.fromisoformat(selected[i]["send_time"])
+                next_time = datetime.fromisoformat(selected[i + 1]["send_time"])
+                delta = (next_time - cur_time).total_seconds()
+                if delta <= max_gap_sec:
+                    merged.insert(0, selected[i]["message"])
+                else:
+                    break
+            except:
+                break
+        return " ".join(merged).strip()
+
     def detect_mode_via_llm(self, user_input: str, memory: str = ""):
-        prompt = f"""아래 사용자 입력과 과거 대화를 보고, 상담 단계(casual, explore, counseling), 감정 키워드, 위험도, 상담 의도를 판단해주세요.
+        emotion_keywords = ["불안", "우울", "외로움", "짜증", "슬픔", "무기력", "분노", "초조함", "혼란", "감정 없음"]
+        keyword_guide = ", ".join(emotion_keywords)
+        prompt = f"""
+아래 사용자 입력과 과거 대화를 보고, 상담 흐름을 판단해주세요.
+
+- 현재 대화 단계 (casual, explore, counseling)
+- 감정 키워드 (아래 목록 중 선택): {keyword_guide}
+- 위험도 (낮음/중간/높음)
+- 상담 의도 (상담 원함/잡담/모름 등)
 
 [과거 대화]
 {memory}
@@ -46,9 +98,9 @@ class ChatAgent:
 [사용자 입력]
 {user_input}
 
-[응답 형식 예시]
+[출력 예시]
 단계: counseling
-감정: 무기력, 불안
+감정: 무기력, 외로움
 위험도: 중간
 의도: 상담 원함
 """
@@ -56,7 +108,7 @@ class ChatAgent:
             result = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "너는 심리상담 대화 흐름을 분석하는 조력자야."},
+                    {"role": "system", "content": "너는 사용자의 대화 흐름과 감정을 분석하는 심리상담 분석 도우미야."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.2,
@@ -72,65 +124,54 @@ class ChatAgent:
                     self.emotion = line.split(":")[-1].strip()
                 elif "위험도:" in line:
                     self.risk = line.split(":")[-1].strip()
-
-            with open("debug_log.txt", "a") as f:
-                f.write(f"🔍 감정 분석 결과 - mode: {self.mode}, emotion: {self.emotion}, risk: {self.risk}\n")
-
         except Exception as e:
-            with open("debug_log.txt", "a") as f:
-                f.write(f"[⚠️ 모드 예측 실패] {e}\n")
+            print(f"[⚠️ 감정 분석 실패] {e}")
 
-    def build_prompt(self, user_input: str, memory: str = "", theory: str = "") -> str:
-        base_prompt = self.get_persona_prompt()
-
-        if self.emotion:
-            base_prompt += (
-                f"\n\n[현재 감정 상태]\n"
-                f"사용자는 '{self.emotion}'라는 감정을 표현했습니다. 이 감정에 대해 진심 어린 공감 + 짧은 질문을 포함하세요."
-            )
-
-        if self.risk.lower() in ["중간", "높음"]:
-            base_prompt += "\n위험도가 높으므로 조심스럽고 간결하게 표현해주세요."
-
-        core_instruction = (
-            "\n\n🧠 당신은 진짜 사람처럼 따뜻하고 공감력 있는 전문 심리상담자입니다.\n"
-            "상담은 진심 어린 공감으로 시작되고, 감정에 정확히 반응하며, 다음 말을 자연스럽게 이어가야 합니다.\n"
-            "사용자의 말 속에서 감정, 상황, 욕구를 파악하고, 다음 두 가지를 조합하여 응답하세요:\n"
-            "- (1) 감정에 대한 공감 표현\n"
-            "- (2) 감정을 유도하거나, 조금 더 깊이 물어볼 수 있는 짧은 질문\n"
-            "절대 판단하지 말고, 설명도 최소화하며, 말은 짧고 진심 있게 해야 합니다.\n"
-            "페르소나에 따라 말투만 달라지며, 진심과 흐름은 모두 동일합니다.\n"
-            "반드시 2문장을 넘기지 마세요."
+    def build_prompt(self, user_input: str, memory: str = "", theory_dict: dict = None) -> str:
+        system_behavior = (
+            "너는 정서적 안정감을 주는 심리상담 전문가야.\n"
+            "- 감정을 반영하며 공감하고, 필요할 경우 상담 이론을 바탕으로 조언해.\n"
+            "- 질문을 반복하지 않고, 흐름에 따라 자연스럽게 진행해.\n"
+            "- 같은 표현을 반복하지 말고, 다양한 어휘와 어조를 사용해.\n"
+            "- 응답은 1~2문장 내외로 자연스럽고 따뜻하게 마무리해.\n"
         )
+        dialogue_flow = (
+            "[대화 흐름]\n"
+            "인사 → 근황 → 감정 표현 → 문제 탐색 → 이론 기반 제안 → 감정 변화 확인 → 마무리"
+        )
+        persona_prompt = self.get_persona_prompt()
+        if self.emotion:
+            persona_prompt += f"\n[감정 감지] 현재 감정: {self.emotion}"
+        if self.risk.lower() in ["중간", "높음"]:
+            persona_prompt += "\n[주의] 민감한 상황입니다. 더 조심스럽게 반응하세요."
+        if theory_dict:
+            strategy_text = self.get_strategy_text(theory_dict)
+            persona_prompt += f"\n\n{strategy_text}"
 
-        return f"{base_prompt}\n{core_instruction}\n\n[대화 흐름 요약]\n{memory}\n\n[상담 이론 요약]\n{theory}\n\n[사용자 말]\n{user_input}"
+        return f"{system_behavior}\n\n{persona_prompt}\n\n{dialogue_flow}\n\n[대화 요약]\n{memory}\n\n[사용자 발화]\n{user_input}\n\n[상담사 응답]"
 
-    def respond(self, user_input: str, message_log: list, member_id: str, theory: list = None, max_tokens: int = 400) -> str:
-        with open("debug_log.txt", "a") as f:
-            f.write(f"\n🧩 respond 진입 | user_input: {user_input}\n")
-
+    def respond(self, user_input: str, message_log: list, member_id: str, max_tokens: int = 150) -> str:
         if is_first_entry(member_id, message_log):
             return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
 
         memory_raw = load_user_memory(member_id, message_log)
-        memory = summarize_memory(memory_raw)
+        memory = summarize_memory(memory_raw, self.persona)
+        merged_input = self.merge_recent_user_inputs(message_log, member_id)
 
-        if len(user_input) > 10:
-            self.detect_mode_via_llm(user_input, memory)
+        self.detect_mode_via_llm(merged_input, memory)
 
-        theory_text = "\n".join([f"[{name}] {desc}" for name, desc in theory]) if isinstance(theory, list) else theory or ""
-        system_prompt = self.build_prompt(user_input, memory, theory_text)
+        theory_dict = {}
+        if self.mode in ["explore", "counseling"] and self.intent == "상담 원함":
+            theory_dict = self.match_theory(self.emotion)
 
-        with open("debug_log.txt", "a") as f:
-            f.write("🧠 build_prompt 완료. GPT 호출 시작...\n")
+        prompt = self.build_prompt(merged_input, memory, theory_dict)
 
         try:
             messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"(과거 대화)\n{memory}"},
-                {"role": "user", "content": user_input}
+                {"role": "system", "content": prompt},
+                *self.get_tone_example(),
+                {"role": "user", "content": merged_input}
             ]
-
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
@@ -138,30 +179,9 @@ class ChatAgent:
                 max_tokens=max_tokens
             )
             reply = response.choices[0].message.content.strip().replace('\n', ' ')
-
-            with open("debug_log.txt", "a") as f:
-                f.write(f"✅ GPT 응답 수신: {reply}\n")
-
-            with open("debug_log.txt", "a") as f:
-                f.write(f"📌 사용된 모델: {response.model}\\n")
-
-            fallback_candidates = [
-                "지금 말해주신 것만으로도 충분히 소중해요. 혹시 더 나눠주실 수 있을까요?",
-                "마음이 복잡하셨겠어요. 편하실 때 천천히 이어서 말해주셔도 괜찮아요.",
-                "잘 전달되었어요. 어떤 부분부터 이야기하고 싶은지 알려주실래요?"
-            ]
-
-            if (
-                len(reply) < 15 or
-                any(x in reply.lower() for x in ["잘 모르겠어요", "죄송", "어려워요", "확실하지 않아요"])
-            ):
-                with open("debug_log.txt", "a") as f:
-                    f.write("🧩 응답 품질 낮음 - fallback 문구 반환\n")
-                return random.choice(fallback_candidates)
-
+            if any(x in merged_input.lower() for x in ["고마워", "도움 됐", "감사"]):
+                reply += " 언제든지 또 이야기 나눠요. 당신의 마음을 응원해요. 😊"
             return reply
-
         except Exception as e:
-            with open("debug_log.txt", "a") as f:
-                f.write(f"⚠️ GPT 호출 실패: {e}\n")
-            return "조금 더 구체적으로 이야기해주실 수 있을까요?"
+            print(f"[⚠️ GPT 호출 실패] {e}")
+            return "답변 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요."

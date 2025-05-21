@@ -3,10 +3,9 @@ from pydantic import BaseModel
 from typing import List
 
 from app.chat_agent import ChatAgent
-from app.wiki_searcher import WikiSearcher
 from app.vector_manager import query_similar_chats, add_chat_to_vector_db
 from app.db_manager import fetch_recent_dialogue
-from app.memory_manager import summarize_memory, is_first_entry  # ✅ is_first_entry 추가
+from app.memory_manager import summarize_memory, is_first_entry
 
 import os
 import sys
@@ -18,7 +17,6 @@ for path in sys.path:
     print("    -", path)
 
 app = FastAPI()
-wiki = WikiSearcher()
 
 # ✅ Request/Response 모델 정의
 class ChatSendRequest(BaseModel):
@@ -37,8 +35,7 @@ class EnterResponse(BaseModel):
 
 # ✅ 응답 문장을 문장 단위로 분리 (한국어 기준 개선)
 def split_into_sentences(text: str) -> List[str]:
-    # 한국어 문장 끝나는 패턴: 마침표, 물음표, 느낌표, ~, … 등
-    sentence_endings = r'[.!?~…]|[\u3002\uFF1F\uFF01]'  # 유니코드 마침표도 포함
+    sentence_endings = r'[.!?~…]|[\u3002\uFF1F\uFF01]'
     sentences = re.split(f'(?<={sentence_endings})\s+', text.strip())
     return [s.strip() for s in sentences if s.strip()]
 
@@ -48,17 +45,18 @@ def chat_with_ai(req: ChatSendRequest):
     if not req.message.strip():
         return ChatSendResponse(message=["조금 더 구체적으로 말씀해주시겠어요?"])
 
-    similar_chats = query_similar_chats(str(req.memberId), req.message, top_k=3)
-    theory_pairs = wiki.search(req.message, top_k=2)
-
     message_log = fetch_recent_dialogue(req.memberId, limit=100)
-
     agent = ChatAgent(persona=req.talkType)
+
+    # (선택적) 병합된 입력 확인용 → 실제 사용은 내부에서 처리됨
+    # merged_input = agent.merge_user_inputs(message_log, str(req.memberId))
+    # print(f"🧠 병합된 입력: {merged_input}")
+
     full_response = agent.respond(
-        user_input=req.message,
+        user_input=req.message,  # ChatAgent 내부에서 병합 처리됨
         message_log=message_log,
         member_id=str(req.memberId),
-        theory=theory_pairs
+        theory=None
     )
 
     add_chat_to_vector_db(
@@ -72,13 +70,13 @@ def chat_with_ai(req: ChatSendRequest):
 
     return ChatSendResponse(message=split_into_sentences(full_response))
 
+
 # ✅ 과거 대화 요약 제공 (/summary)
 @app.post("/summary", response_model=EnterResponse)
 def enter_chat(req: EnterRequest):
     message_log = fetch_recent_dialogue(req.memberId, limit=100)
     print(f"📥 /summary: DB에서 {len(message_log)}개 대화 불러옴")
 
-    # ✅ 첫 입장인 경우 summary 대신 NULL 반환
     if is_first_entry(str(req.memberId), message_log):
         print("🟡 첫 입장 확인됨 (NULL 출력)")
         return EnterResponse(summary=["NULL"])
