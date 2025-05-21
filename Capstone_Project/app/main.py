@@ -18,8 +18,7 @@ def run_model(user_input: str, member_id: str = "1", persona: str = "위로형")
     response = agent.respond(
         user_input=user_input,
         message_log=message_log,
-        member_id=member_id,
-        theory=None  # ✅ 상담 이론 적용 조건은 ChatAgent 내부에서 판단
+        member_id=member_id
     )
 
     add_chat_to_vector_db(
@@ -32,6 +31,7 @@ def run_model(user_input: str, member_id: str = "1", persona: str = "위로형")
     )
 
     return response
+
 
 # ✅ CLI에서 실행할 함수
 def run_chat(member_id: str, user_input: str, persona: str = "위로형"):

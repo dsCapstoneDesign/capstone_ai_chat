@@ -53,10 +53,9 @@ def chat_with_ai(req: ChatSendRequest):
     # print(f"🧠 병합된 입력: {merged_input}")
 
     full_response = agent.respond(
-        user_input=req.message,  # ChatAgent 내부에서 병합 처리됨
+        user_input=req.message,
         message_log=message_log,
-        member_id=str(req.memberId),
-        theory=None
+        member_id=str(req.memberId)
     )
 
     add_chat_to_vector_db(
