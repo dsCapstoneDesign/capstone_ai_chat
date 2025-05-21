@@ -142,6 +142,9 @@ class ChatAgent:
             with open("debug_log.txt", "a") as f:
                 f.write(f"✅ GPT 응답 수신: {reply}\n")
 
+            with open("debug_log.txt", "a") as f:
+                f.write(f"📌 사용된 모델: {response.model}\\n")
+
             fallback_candidates = [
                 "지금 말해주신 것만으로도 충분히 소중해요. 혹시 더 나눠주실 수 있을까요?",
                 "마음이 복잡하셨겠어요. 편하실 때 천천히 이어서 말해주셔도 괜찮아요.",
