@@ -46,11 +46,10 @@ def chat_with_ai(req: ChatSendRequest):
         return ChatSendResponse(message=["조금 더 구체적으로 말씀해주시겠어요?"])
 
     message_log = fetch_recent_dialogue(req.memberId, limit=100)
-    agent = ChatAgent(persona=req.talkType)
+    agent = ChatAgent(persona=req.talkType or "위로형")
 
-    # (선택적) 병합된 입력 확인용 → 실제 사용은 내부에서 처리됨
-    # merged_input = agent.merge_user_inputs(message_log, str(req.memberId))
-    # print(f"🧠 병합된 입력: {merged_input}")
+    if is_first_entry(str(req.memberId), message_log):
+        return ChatSendResponse(message=["안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"])
 
     full_response = agent.respond(
         user_input=req.message,
@@ -68,7 +67,6 @@ def chat_with_ai(req: ChatSendRequest):
     )
 
     return ChatSendResponse(message=split_into_sentences(full_response))
-
 
 # ✅ 과거 대화 요약 제공 (/summary)
 @app.post("/summary", response_model=EnterResponse)
