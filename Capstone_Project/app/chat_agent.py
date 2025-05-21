@@ -44,6 +44,24 @@ class ChatAgent:
         except Exception:
             return []
 
+    def get_tone_example(self):
+        if self.persona == "위로형":
+            return [
+                {"role": "user", "content": "요즘 너무 지치고 외로워요."},
+                {"role": "assistant", "content": "많이 힘드셨겠어요. 어떤 일이 있었는지 이야기해줄래요?"}
+            ]
+        elif self.persona == "논리형":
+            return [
+                {"role": "user", "content": "계속 실수하고 일이 꼬여요."},
+                {"role": "assistant", "content": "어떤 상황에서 실수가 반복되고 있는지 함께 정리해볼까요?"}
+            ]
+        elif self.persona == "긍정형":
+            return [
+                {"role": "user", "content": "요즘 무기력하고 의욕이 없어요."},
+                {"role": "assistant", "content": "그럴 땐 잠깐 쉬어가는 것도 괜찮아요. 다시 힘낼 준비가 됐을 때 뭐부터 하고 싶나요? 😊"}
+            ]
+        return []
+
     def match_theory(self, emotion: str) -> dict:
         for theory in self.theory_data:
             if emotion in theory.get("추천상황", []):
