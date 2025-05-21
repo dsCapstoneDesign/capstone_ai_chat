@@ -1,12 +1,17 @@
 from app.config.openai_client import client
 from collections import Counter
 import re
+from datetime import datetime
+
+# 캐시용 딕셔너리 (세션 유지 시 활용)
+_summary_cache = {}
 
 def load_user_memory(member_id: str, message_log: list) -> list:
+    # 최근 메시지 더 많이 불러오기 (유저 중심)
     user_msgs = [m for m in message_log if str(m.get("member_id")) == str(member_id) and m.get("sender") == "USER"]
     bot_msgs = [m for m in message_log if str(m.get("member_id")) == str(member_id) and m.get("sender") == "BOT"]
 
-    selected = user_msgs[-5:] + bot_msgs[-10:]
+    selected = user_msgs[-10:] + bot_msgs[-10:]  # 더 많은 문맥 확보
     selected.sort(key=lambda x: x.get("send_time", 0))
     print(f"🧩 load_user_memory: 선택된 메시지 {len(selected)}개")
     return selected
@@ -23,10 +28,15 @@ def extract_keywords(dialogue_text: str, top_k: int = 3) -> list:
     common = [word for word, _ in counter.most_common(top_k)]
     return common
 
-def summarize_memory(memory_messages: list, persona: str = "위로형") -> str:
+def summarize_memory(memory_messages: list, persona: str = "위로형", member_id: str = "") -> str:
     if not memory_messages:
         print("⚠️ [summarize_memory] memory_messages가 비어 있음")
         return "최근에는 어떤 일이 있으셨나요? 편하게 이야기해 주세요."
+
+    # 캐시 확인
+    if member_id in _summary_cache:
+        print("✅ [캐시 사용] 이전 요약 반환")
+        return _summary_cache[member_id]
 
     try:
         dialogue = "\n".join([
@@ -37,7 +47,7 @@ def summarize_memory(memory_messages: list, persona: str = "위로형") -> str:
         print(f"🧠 [요약 대상 대화 - 총 {len(memory_messages)}개]\n{dialogue}\n---")
 
         if len(dialogue) > 1500:
-            dialogue = dialogue[-1500:]
+            dialogue = dialogue[-1500:]  # 토큰 절약
 
         keywords = extract_keywords(dialogue)
 
@@ -64,7 +74,7 @@ def summarize_memory(memory_messages: list, persona: str = "위로형") -> str:
         system_prompt = system_prompt_map.get(persona, system_prompt_map["위로형"])
 
         prompt = f"""
-아래는 사용자의 지난 대화 내용이야.\n
+아래는 사용자의 지난 대화 내용이야.
 - 중심 주제를 자연스럽게 언급해 줘 (예: 공부, 인간관계, 감정 등)
 - 감정 키워드만 나열하지 말고, 왜 그런 감정이었는지 연결해줘
 - 표현은 자연스럽고 상담사가 다음 턴을 이끌 수 있게 해줘
@@ -97,6 +107,10 @@ def summarize_memory(memory_messages: list, persona: str = "위로형") -> str:
 
         if len(result) < 5:
             print("⚠️ 요약 실패 또는 응답 너무 짧음")
+
+        # 캐싱 저장
+        if member_id:
+            _summary_cache[member_id] = result
 
         return result
 

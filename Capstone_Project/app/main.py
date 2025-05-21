@@ -2,7 +2,6 @@ import argparse
 from app.chat_agent import ChatAgent
 from app.vector_manager import add_chat_to_vector_db
 from app.db_manager import fetch_recent_dialogue
-from app.memory_manager import is_first_entry
 
 # ✅ FastAPI에서 호출할 함수
 def run_model(user_input: str, member_id: str = "1", persona: str = "위로형") -> str:
@@ -11,9 +10,6 @@ def run_model(user_input: str, member_id: str = "1", persona: str = "위로형")
 
     message_log = fetch_recent_dialogue(member_id, limit=100)
     agent = ChatAgent(persona=persona)
-
-    if is_first_entry(member_id, message_log):
-        return "안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊"
 
     response = agent.respond(
         user_input=user_input,
@@ -42,16 +38,10 @@ def run_chat(member_id: str, user_input: str, persona: str = "위로형"):
     message_log = fetch_recent_dialogue(member_id, limit=100)
     agent = ChatAgent(persona=persona)
 
-    if is_first_entry(member_id, message_log):
-        print("🟡 첫 입장입니다.")
-        print("🧘 상담사 응답:\n안녕하세요! 처음 오셨군요. 편하게 이야기해 주세요. 😊")
-        return
-
     response = agent.respond(
         user_input=user_input,
         message_log=message_log,
-        member_id=member_id,
-        theory=None  # ✅ 상담 이론 적용은 ChatAgent 내부에서 판단
+        member_id=member_id
     )
 
     add_chat_to_vector_db(
