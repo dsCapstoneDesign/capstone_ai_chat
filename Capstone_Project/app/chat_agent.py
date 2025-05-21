@@ -1,13 +1,9 @@
-import random
 from app.config.openai_client import client
-from app.memory_manager import summarize_memory, load_user_memory
+from app.memory_manager import summarize_memory, load_user_memory, is_first_entry
 from app.wiki_searcher import WikiSearcher
 from datetime import datetime
 import json
-
-def is_first_entry(member_id, message_log):
-    user_msgs = [m for m in message_log if m.get("sender") == "USER" and str(m.get("member_id")) == str(member_id)]
-    return len(user_msgs) <= 1
+import random
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -49,23 +45,24 @@ class ChatAgent:
             return []
 
     def get_tone_example(self):
-        examples = {
-            "위로형": [
+        if self.persona == "위로형":
+            return [
                 {"role": "user", "content": "요즘 너무 지치고 외로워요."},
                 {"role": "assistant", "content": "많이 힘드셨겠어요. 어떤 일이 있었는지 이야기해줄래요?"}
-            ],
-            "논리형": [
+            ]
+        elif self.persona == "논리형":
+            return [
                 {"role": "user", "content": "계속 실수하고 일이 꼬여요."},
                 {"role": "assistant", "content": "어떤 상황에서 실수가 반복되고 있는지 함께 정리해볼까요?"}
-            ],
-            "긍정형": [
+            ]
+        elif self.persona == "긍정형":
+            return [
                 {"role": "user", "content": "요즘 무기력하고 의욕이 없어요."},
                 {"role": "assistant", "content": "그럴 땐 잠깐 쉬어가는 것도 괜찮아요. 다시 힘낼 준비가 됐을 때 뭐부터 하고 싶나요? 😊"}
             ]
-        }
-        return examples.get(self.persona, [])
+        return []
 
-    def match_theory(self, emotion):
+    def match_theory(self, emotion: str) -> dict:
         for theory in self.theory_data:
             if emotion in theory.get("추천상황", []):
                 return theory
@@ -83,9 +80,9 @@ class ChatAgent:
             f"예시: {theory_dict['적용사례'][0]}"
         )
 
-    def merge_recent_user_inputs(self, message_log, member_id, max_gap_sec=30, max_merge_count=5):
+    def merge_recent_user_inputs(self, message_log: list, member_id: str, max_gap_sec=30, max_merge_count=5) -> str:
         user_msgs = [m for m in message_log if m.get("sender") == "USER" and str(m.get("member_id")) == str(member_id)]
-        if not user_msgs:
+        if len(user_msgs) < 1:
             return ""
         selected = sorted(user_msgs[-max_merge_count:], key=lambda x: x.get("send_time"))
         merged = [selected[-1]["message"]]
@@ -93,7 +90,8 @@ class ChatAgent:
             try:
                 cur_time = datetime.fromisoformat(selected[i]["send_time"])
                 next_time = datetime.fromisoformat(selected[i + 1]["send_time"])
-                if (next_time - cur_time).total_seconds() <= max_gap_sec:
+                delta = (next_time - cur_time).total_seconds()
+                if delta <= max_gap_sec:
                     merged.insert(0, selected[i]["message"])
                 else:
                     break
@@ -101,13 +99,14 @@ class ChatAgent:
                 break
         return " ".join(merged).strip()
 
-    def detect_mode_via_llm(self, user_input, memory=""):
-        keywords = ["불안", "우울", "외로움", "짜증", "슬픔", "무기력", "분노", "초조함", "혼란", "감정 없음"]
+    def detect_mode_via_llm(self, user_input: str, memory: str = ""):
+        emotion_keywords = ["불안", "우울", "외로움", "짜증", "슬픔", "무기력", "분노", "초조함", "혼란", "감정 없음"]
+        keyword_guide = ", ".join(emotion_keywords)
         prompt = f"""
 아래 사용자 입력과 과거 대화를 보고, 상담 흐름을 판단해주세요.
 
 - 현재 대화 단계 (casual, explore, counseling)
-- 감정 키워드 (아래 목록 중 선택): {', '.join(keywords)}
+- 감정 키워드 (아래 목록 중 선택): {keyword_guide}
 - 위험도 (낮음/중간/높음)
 - 상담 의도 (상담 원함/잡담/모름 등)
 
@@ -146,7 +145,7 @@ class ChatAgent:
         except Exception as e:
             print(f"[⚠️ 감정 분석 실패] {e}")
 
-    def build_prompt(self, user_input, memory="", theory_dict=None):
+    def build_prompt(self, user_input: str, memory: str = "", theory_dict: dict = None) -> str:
         system_behavior = (
             "너는 정서적 안정감을 주는 심리상담 전문가야.\n"
             "- 감정을 반영하며 공감하고, 필요할 경우 상담 이론을 바탕으로 조언해.\n"
@@ -164,27 +163,27 @@ class ChatAgent:
         if self.risk.lower() in ["중간", "높음"]:
             persona_prompt += "\n[주의] 민감한 상황입니다. 더 조심스럽게 반응하세요."
         if theory_dict:
-            persona_prompt += f"\n\n{self.get_strategy_text(theory_dict)}"
+            strategy_text = self.get_strategy_text(theory_dict)
+            persona_prompt += f"\n\n{strategy_text}"
 
         return f"{system_behavior}\n\n{persona_prompt}\n\n{dialogue_flow}\n\n[대화 요약]\n{memory}\n\n[사용자 발화]\n{user_input}\n\n[상담사 응답]"
 
-    def respond(self, user_input, message_log, member_id, max_tokens=150):
-        memory_raw = load_user_memory(member_id, message_log)
-        memory = summarize_memory(memory_raw, self.persona)
-        merged_input = self.merge_recent_user_inputs(message_log, member_id)
-
-        if not merged_input:
-            return "지금 어떤 생각이 드시나요? 편하게 이야기해 주세요. 😊"
-
+    def respond(self, user_input: str, message_log: list, member_id: str, max_tokens: int = 150) -> str:
         if is_first_entry(member_id, message_log):
-            greetings = [
+            return random.choice([
                 "안녕하세요! 처음 오셨군요. 어떤 이야기가 마음에 남아 있는지 나눠주셔도 좋아요.",
                 "처음 만나 반가워요. 요즘 어떤 고민이 있으신가요?",
-                "처음이 가장 어려운 법이죠. 편하게 말씀하셔도 괜찮아요."
-            ]
-            return random.choice(greetings)
+                "처음이 가장 어렵죠. 천천히 편하게 이야기 나눠요."
+            ])
 
+        memory_raw = load_user_memory(member_id, message_log)
+        memory = ""
+        if memory_raw:
+            memory = summarize_memory(memory_raw, self.persona, member_id)
+
+        merged_input = self.merge_recent_user_inputs(message_log, member_id)
         self.detect_mode_via_llm(merged_input, memory)
+
         theory_dict = {}
         if self.mode in ["explore", "counseling"] and self.intent == "상담 원함":
             theory_dict = self.match_theory(self.emotion)
@@ -195,7 +194,6 @@ class ChatAgent:
             messages = [
                 {"role": "system", "content": prompt},
                 *self.get_tone_example(),
-                {"role": "assistant", "content": f"지금까지 이야기해 주신 걸 정리해 보면요:\n{memory}"},
                 {"role": "user", "content": merged_input}
             ]
             response = client.chat.completions.create(

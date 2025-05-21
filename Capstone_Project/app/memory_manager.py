@@ -29,9 +29,9 @@ def extract_keywords(dialogue_text: str, top_k: int = 3) -> list:
     return common
 
 def summarize_memory(memory_messages: list, persona: str = "위로형", member_id: str = "") -> str:
-    if not memory_messages:
-        print("⚠️ [summarize_memory] memory_messages가 비어 있음")
-        return "최근에는 어떤 일이 있으셨나요? 편하게 이야기해 주세요."
+    if not memory_messages or len(memory_messages) < 3:
+        print("⚠️ [summarize_memory] 메시지가 부족함 (3턴 미만)")
+        return "지난 이야기를 정리하는 데 문제가 있었어요. 편하게 오늘 이야기를 시작해볼까요?"
 
     # 캐시 확인
     if member_id in _summary_cache:
@@ -107,6 +107,7 @@ def summarize_memory(memory_messages: list, persona: str = "위로형", member_i
 
         if len(result) < 5:
             print("⚠️ 요약 실패 또는 응답 너무 짧음")
+            return "지난번엔 대화가 너무 짧았어요. 오늘은 편하게 이야기를 해볼가요?"
 
         # 캐싱 저장
         if member_id:
@@ -116,4 +117,4 @@ def summarize_memory(memory_messages: list, persona: str = "위로형", member_i
 
     except Exception as e:
         print(f"❌ [Memory Summarization Error] {e}")
-        return "지난 대화 내용을 불러오는 데 문제가 있었어요. 요즘은 기분이 좀 어떠세요?"
+        return "지난 이야기를 정리하는 데 문제가 있었어요. 편하게 오늘 이야기를 시작해볼까요?"
