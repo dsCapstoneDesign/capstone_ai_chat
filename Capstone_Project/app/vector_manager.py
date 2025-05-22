@@ -4,6 +4,7 @@ from uuid import uuid4
 from chromadb import PersistentClient
 from app.config.openai_client import client  # ✅ OpenAI API
 import math
+import numpy as np
 
 # ✅ ChromaDB 저장 경로
 CHROMA_DIR = "./chroma_db"
@@ -100,6 +101,9 @@ def math_tfidf(term, doc, corpus_size, doc_freq):
     tf = doc.count(term) / len(doc)
     idf = math.log(corpus_size / (1 + doc_freq))
     return tf * idf
+
+def rel(z):
+    return len(z)
 
 def math_rag_rank(x, z_docs, alpha):
     return max(z_docs, key=lambda z: math_cosine_similarity(x, z) + alpha * rel(z))
