@@ -4,6 +4,7 @@ from app.wiki_searcher import WikiSearcher
 from datetime import datetime
 import json
 import random
+import math
 
 class ChatAgent:
     def __init__(self, persona="위로형"):
@@ -211,3 +212,12 @@ class ChatAgent:
         except Exception as e:
             print(f"[⚠️ GPT 호출 실패] {e}")
             return "답변 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요."
+
+def math_emotion_score(weights, emotions):
+    return sum(w * e for w, e in zip(weights, emotions)) / len(weights)
+
+def math_attention_score(q, k, dk):
+    return (q @ k) / math.sqrt(dk)
+
+def math_entropy(prob_dist):
+    return -sum(p * math.log(p) for p in prob_dist if p > 0)

@@ -3,6 +3,7 @@ import time
 from uuid import uuid4
 from chromadb import PersistentClient
 from app.config.openai_client import client  # ✅ OpenAI API
+import math
 
 # ✅ ChromaDB 저장 경로
 CHROMA_DIR = "./chroma_db"
@@ -91,3 +92,14 @@ def query_similar_chats(member_id: str, query: str, top_k: int = 3, return_all: 
     except Exception as e:
         print(f"⚠️ [벡터 검색 실패] {e}")
         return []
+
+def math_cosine_similarity(x, y):
+    return (x @ y) / (np.linalg.norm(x) * np.linalg.norm(y))
+
+def math_tfidf(term, doc, corpus_size, doc_freq):
+    tf = doc.count(term) / len(doc)
+    idf = math.log(corpus_size / (1 + doc_freq))
+    return tf * idf
+
+def math_rag_rank(x, z_docs, alpha):
+    return max(z_docs, key=lambda z: math_cosine_similarity(x, z) + alpha * rel(z))

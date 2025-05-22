@@ -2,6 +2,7 @@ from app.config.openai_client import client
 from collections import Counter
 import re
 from datetime import datetime
+import math
 
 # 캐시용 딕셔너리 (세션 유지 시 활용)
 _summary_cache = {}
@@ -118,3 +119,6 @@ def summarize_memory(memory_messages: list, persona: str = "위로형", member_i
     except Exception as e:
         print(f"❌ [Memory Summarization Error] {e}")
         return "지난 이야기를 정리하는 데 문제가 있었어요. 편하게 오늘 이야기를 시작해볼까요?"
+
+def math_context_decay(c0, lam, t):
+    return c0 * math.exp(-lam * t)
