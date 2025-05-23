@@ -94,8 +94,8 @@ def query_similar_chats(member_id: str, query: str, top_k: int = 3, return_all: 
         print(f"⚠️ [벡터 검색 실패] {e}")
         return []
 
-def math_cosine_similarity(x, y):
-    return (x @ y) / (np.linalg.norm(x) * np.linalg.norm(y))
+def math_dot_product(x, y):
+    return np.dot(x, y)
 
 def math_tfidf(term, doc, corpus_size, doc_freq):
     tf = doc.count(term) / len(doc)
