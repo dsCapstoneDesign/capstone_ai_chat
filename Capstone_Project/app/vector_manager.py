@@ -106,4 +106,5 @@ def rel(z):
     return len(z)
 
 def math_rag_rank(x, z_docs, alpha):
-    return max(z_docs, key=lambda z: math_cosine_similarity(x, z) + alpha * rel(z))
+    return max(z_docs, key=lambda z: math_dot_product(x, z) + alpha * rel(z))
+
