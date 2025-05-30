@@ -174,9 +174,9 @@ class ChatAgent:
     def respond(self, user_input: str, message_log: list, member_id: str, max_tokens: int = 150) -> str:
         if is_first_entry(member_id, message_log):
             return random.choice([
-                "안녕하세요! 처음 오셨군요. 어떤 이야기가 마음에 남아 있는지 나눠주셔도 좋아요.",
+                "안녕하세요! 오늘 기분은 어때요?",
                 "처음 만나 반가워요. 요즘 어떤 고민이 있으신가요?",
-                "처음이 가장 어렵죠. 천천히 편하게 이야기 나눠요."
+                "안녕하세요. 만나서 반가워요."
             ])
 
         memory_raw = load_user_memory(member_id, message_log)
